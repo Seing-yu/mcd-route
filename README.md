@@ -99,6 +99,24 @@ set MCD_MCP_TOKEN=你的token      # Windows
 [`mcp-config.example.json`](mcp-config.example.json) 的内容，
 把 `${MCD_MCP_TOKEN}` 替换为你的真实 Token，保存 → 点【信任】→ 开启开关。
 
+**Windows 一键配置（推荐，Token 不经过对话）**：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\skills\mcd-route\scripts\setup_mcp.ps1
+```
+
+脚本会从 `~/.workbuddy/.mcd_token` 读 Token → 备份原 `mcp.json` →
+写出新配置 → 校验 JSON 与编码，全程**不回显 Token**。
+
+> 🪟 **两个 Windows 编码坑（脚本已规避，但你手写配置时会踩）**
+>
+> | 坑 | 后果 | 对策 |
+> |---|---|---|
+> | `Set-Content -Encoding UTF8` 写入 **BOM** | WorkBuddy 严格 JSON 解析，报 `Unexpected UTF-8 BOM`，连接器加载不出来 | 用 `UTF8Encoding($false)` 写；或直接用 `setup_mcp.ps1` |
+> | `.ps1` 存成**无 BOM** UTF-8 | PowerShell 5.1 按 ANSI 解码，脚本里的中文注释乱码 | `.ps1` 存成 **UTF-8 with BOM**（仓库里这份已带 BOM） |
+>
+> 这两条都在 `scripts/selftest.py` 里有对应断言，回归时自动检查。
+
 > ⚠️ **WorkBuddy 桌面端不会展开 `${MCD_MCP_TOKEN}` 这类环境变量占位符。**
 > 它只会把字符串原样塞进请求头（实测：占位符会变成
 > `Bearer ${MCD_MCP_TOKEN}` 发给服务器，必然 401）。
@@ -407,11 +425,12 @@ python real_run.py              # 用【你自己的】账号跑真实链路
     ├── scripts/
     │   ├── mcp_client.py          # 纯标准库 MCP 客户端（握手/工具列表/调用/合规护栏）
     │   ├── decider.py             # 决策引擎：渠道计价、对比、券体检、单位归一化
-│   ├── selftest.py            # 119 项自测
-│   ├── parity_check.py        # 前后端对拍（页面 vs CLI）
-│   ├── parity_check.mjs       # 前端计算引擎抽取器
-│   ├── setup_token.py         # 交互式配置 Token（不回显，不进对话）
-│   ├── mcp_probe.py           # MCP 连通性自检（四层）
+    │   ├── selftest.py            # 127 项自测
+    │   ├── parity_check.py        # 前后端对拍（页面 vs CLI）
+    │   ├── parity_check.mjs       # 前端计算引擎抽取器
+    │   ├── setup_token.py         # 交互式配置 Token（不回显，不进对话）
+    │   ├── setup_mcp.ps1          # Windows 一键写入 WorkBuddy 连接器配置（无 BOM）
+    │   ├── mcp_probe.py           # MCP 连通性自检（四层）
     │   └── sample_data/
     │       └── scenario.json      # 离线样例，无需 Token 即可跑通
     └── references/

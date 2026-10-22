@@ -433,6 +433,51 @@ CI 会立刻失败。
 - 全仓库无真实 Token / 密钥 / 个人住址
 - 内容中性表述，不与其他品牌对比，不贬损麦当劳
 
+### 阶段 9 · 接入 WorkBuddy 原生 MCP 通道（Windows）
+
+**背景**：本 Skill 的 `allowed-tools` 是 `mcp__mcd-mcp__*`，走 WorkBuddy 原生
+Tool 调用通道。要让这条通道真正可用，必须在 WorkBuddy 的自定义连接器里
+装好 `mcd-mcp`。
+
+**查证过程**（读 WorkBuddy 桌面端 `app.asar` 源码，不是猜的）：
+- 自定义 MCP 的配置落盘位置是 `getConfigDir()/mcp.json`
+  = `~/.workbuddy/mcp.json`（`UserMcpFile.filePath`），
+  **桌面端与 CLI 读的是同一份文件**
+- `type` 字段只接受 `stdio` / `sse` / `http` 三个值；
+  `streamablehttp` 不是合法值（`toUserServerForm` 源码枚举）
+- 桌面端**不展开** `${MCD_MCP_TOKEN}` 这类环境变量占位符
+  （`toStringRecord` 无展开逻辑）→ 必然 401
+- 首次连接需要在连接器面板点【信任】（`mcp-approvals.json`，
+  `approvalKey = serverName::configHash`）
+- 改完 `mcp.json` 需重启 WorkBuddy 生效（**无文件监听**）
+- 工具名前缀 = `mcp__<mcp.json 的 key>__<tool>` → `mcp__mcd-mcp__*`
+
+**踩坑：UTF-8 BOM**
+用户用 PowerShell 5.1 的 `Set-Content -Encoding UTF8` 写入 `mcp.json`，
+会带上 3 字节 BOM，WorkBuddy 的严格 JSON 解析器直接报
+`Unexpected UTF-8 BOM` → 连接器加载不出来，且报错信息难以定位。
+用二进制方式剥掉 `EF BB BF` 后恢复正常。
+> 同一个坑在 `.ps1` 文件上是**反的**：脚本含中文注释，必须存成
+> **UTF-8 with BOM**，否则 PowerShell 5.1 按 ANSI 解码，注释乱码。
+
+**产出**：`scripts/setup_mcp.ps1`
+- 从 `~/.workbuddy/.mcd_token` 读 Token → 备份原 `mcp.json`（`.bak`）
+  → 用 `UTF8Encoding($false)` 写出**无 BOM** JSON → 校验 JSON 与编码
+- Token 只以 `$($token.Length)` 形式回显长度，**不打印内容**
+- 已在临时沙箱中冒烟测试：输出无 BOM、JSON 可解析、`type=http` 正确
+- `selftest.py` 新增 8 项断言锁定上述编码与安全约束
+
+**实测验证**（用写入后的 `mcp.json` 真实发起调用）：
+initialize 握手 ✓（协议 2025-06-18，服务器 `mcd-mcp` v1.0.0）
+→ tools/list ✓ 35 个 Tool 全部在线
+→ 项目依赖的 4 个 Tool（`query-nearby-stores` / `query-meals` /
+`calculate-price` / `now-time-info`）全部存在。
+
+**合规对照**：官方《麦当劳MCP服务规则》第三条第 2 项禁止「批量、高频或
+自动化调用」，第六条第 2 项禁止「利用脚本、爬虫或任何自动化工具调用
+本服务」。因此本项目**正式交付形态是 WorkBuddy 原生 Tool 调用**，
+仓库里的 Python 脚本仅作开发期自测与降级备用，不作为调用入口。
+
 ---
 
 ## 三、与 WorkBuddy 的协作方式
@@ -445,9 +490,10 @@ CI 会立刻失败。
 | 赛道分析 | 遍历 101 个进榜项目名与描述，统计 Tool 使用方向，定位空白赛道 |
 | 协议调研 | 确认 MCP Streamable HTTP 的握手顺序、请求头、响应格式与错误码 |
 | 编码 | 实现 MCP 客户端、决策引擎、自测套件、连通自检 |
-| 测试 | 编写并运行 119 项断言，驱动 3 次修正 |
+| 测试 | 编写并运行 127 项断言，驱动 3 次修正 |
 | 文档 | 产出 6 份必交文件中的 5 份（本文件除外为对话记录） |
 | 排错 | 定位并修复 JSON 重复键、Python 沙箱网络限制、金额格式化与文案逻辑问题 |
+| 连接器落地 | 读 WorkBuddy 桌面端源码查清自定义 MCP 机制，产出 `setup_mcp.ps1`，解决 UTF-8 BOM 导致的连接器加载失败 |
 
 **WorkBuddy 的角色是「完整实现 + 可验证」**：所有金额由确定性算法计算
 （`decider.py`），所有 MCP 数据可由 `mcp_probe.py` 现场复现，
@@ -466,8 +512,14 @@ CI 会立刻失败。
    真实最优解可能需要组合，本项目**刻意**不做。
 3. **配送费依赖 `calculate-price`**：该接口的返回是唯一可信来源；
    若其返回中缺少配送费字段，本次计算不计入配送费并显式声明。
-4. **真实 Token 联调待完成**：`mcp_probe.py` 的实测记录将在获得 Token 后补入
-   `references/mcp-tools.md` 第七节。
+4. **脚本调用存在合规边界**：官方规则第三条第 2 项与第六条第 2 项
+   禁止批量 / 自动化 / 脚本调用本服务，因此本项目正式交付形态是
+   **WorkBuddy 原生 Tool 调用**（`mcp__mcd-mcp__*`），
+   仓库脚本仅作开发期自测与降级备用，不作为调用入口。
+5. **端到端决策尚待连接器装载后复跑**：`mcp_probe.py` 的真实调用记录
+   已在 `references/mcp-tools.md` 第七节；完整的「真实门店 → 券 →
+   打包费 → 时间成本折算」端到端输出，需在 WorkBuddy 重启、连接器
+   装好并信任之后由原生通道复跑确认。
 
 ---
 

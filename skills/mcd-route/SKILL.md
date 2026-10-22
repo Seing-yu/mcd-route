@@ -174,11 +174,23 @@ python scripts/decider.py --scenario <scenario.json> --minute-cost 0.5
 ```
 scripts/mcp_client.py   纯标准库 MCP 客户端（握手 / tools/list / tools/call）
 scripts/decider.py      决策引擎：渠道计价、对比、券体检
-scripts/selftest.py     119 项自测，改逻辑后必跑
+scripts/selftest.py     127 项自测，改逻辑后必跑
 scripts/mcp_probe.py    连通性自检：证明数据链路是真的
+scripts/setup_token.py  交互式写入本地凭据文件（不回显）
+scripts/setup_mcp.ps1   Windows：把凭据写进 WorkBuddy 连接器配置（无 BOM）
 scripts/sample_data/    离线样例，无需 Token 即可跑通全流程
 references/mcp-tools.md Tool 清单与字段映射
 ```
+
+### 接入 WorkBuddy 原生 MCP 通道
+
+本 Skill 的 `allowed-tools` 是 `mcp__mcd-mcp__*`，走 WorkBuddy 原生 Tool 调用。
+用户需在【连接器】里装好 `mcd-mcp`（`scripts/setup_mcp.ps1` 可一键写入配置，
+Windows 用户再点【信任】并重启 WorkBuddy 即可）。
+
+> 为什么必须走原生通道：官方《麦当劳MCP服务规则》第三条与第六条
+> 明确限制批量 / 自动化 / 脚本调用本服务。本仓库的 Python 脚本仅供
+> **开发期自测与降级备用**，正式交付形态以 WorkBuddy 原生 Tool 调用为准。
 
 ## 隐私与合规
 

@@ -492,6 +492,42 @@ if os.path.exists(_cfg_path):
 else:
     check("配置文件存在", False, _cfg_path)
 
+# setup_mcp.ps1：Windows 装机脚本
+# 关键断言：写出的 mcp.json 必须无 BOM（WorkBuddy 用严格 JSON 解析器，
+# 带 BOM 会报 "Unexpected UTF-8 BOM" 而加载失败）；
+# 脚本自身含中文注释，必须带 UTF-8 BOM（PowerShell 5.1 否则按 ANSI 解码乱码）。
+_ps1_path = os.path.join(_repo_root, "skills", "mcd-route", "scripts", "setup_mcp.ps1")
+if os.path.exists(_ps1_path):
+    with open(_ps1_path, "rb") as fh:
+        _ps1_raw = fh.read()
+    check("setup_mcp.ps1 存在", True)
+    check("setup_mcp.ps1 以 UTF-8 BOM 保存（PowerShell 5.1 读中文注释需要）",
+          _ps1_raw.startswith(b"\xef\xbb\xbf"))
+    _ps1_text = _ps1_raw.decode("utf-8-sig")
+    check("setup_mcp.ps1 写出无 BOM JSON（用 UTF8Encoding($false)）",
+          "UTF8Encoding($false)" in _ps1_text
+          and "WriteAllText" in _ps1_text)
+    # 只看可执行行（注释里出现 Set-Content 是为了解释这个坑）
+    _ps1_code = re.sub(r"<#.*?#>", "", _ps1_text, flags=re.S)
+    _ps1_code = "\n".join(
+        ln for ln in _ps1_code.splitlines()
+        if not ln.strip().startswith("#"))
+    check("setup_mcp.ps1 不用 Set-Content -Encoding UTF8（会引入 BOM）",
+          not re.search(r"Set-Content[^\n]*-Encoding", _ps1_code))
+    check("setup_mcp.ps1 写入正确的 type=http",
+          "'http'" in _ps1_text and "mcp.mcd.cn" in _ps1_text)
+    check("setup_mcp.ps1 不硬编码任何 Token",
+          not re.search(r"Bearer\s+(?!\$\{|\$token)[A-Za-z0-9_\-\.]{16,}", _ps1_text))
+    check("setup_mcp.ps1 回显前先备份原配置",
+          ".bak" in _ps1_text)
+    # Token 只允许以 $token.Length 形式出现在输出里，绝不能原样打印
+    _token_prints = [m for m in re.findall(r"Write-Host[^\n]*", _ps1_text)
+                     if "$token" in m and "$($token.Length)" not in m]
+    check("setup_mcp.ps1 不原样打印 Token",
+          not _token_prints, "; ".join(_token_prints[:2]))
+else:
+    check("setup_mcp.ps1 存在", False, _ps1_path)
+
 # 个人信息扫描：仓库不得包含开发者真实身份信息
 # 排除官方原文存档（docs/mcp-rules-*.html 是麦当劳规则页快照，
 # 里面的客服邮箱属于官方信息，不是开发者隐私）
