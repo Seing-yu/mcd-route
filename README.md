@@ -38,7 +38,7 @@
 
 ## 🎮 在线试算（无需登录，浏览器打开即玩）
 
-**→ <https://swing-yu.github.io/mcd-route/>**
+**→ <https://Seing-yu.github.io/mcd-route/>**
 
 拖动配送费、起送价、等待时间、**每分钟时间成本**，实时看出哪个渠道更划算；
 勾掉某张券，立刻看到结论怎么变。
