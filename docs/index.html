@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>麦门渠道官 · 在线试算</title>
+<style>
+  :root{
+    --bg:#ffffff; --bg-2:#f7f7f5; --bg-3:#f1efe8;
+    --tx:#1c1c1a; --tx-2:#5f5e5a; --tx-3:#888780;
+    --bd:rgba(0,0,0,.14); --bd-2:rgba(0,0,0,.28);
+    --teal:#0f6e56; --teal-bg:#e1f5ee; --teal-bd:#1d9e75;
+    --blue:#185fa5; --blue-bg:#e6f1fb; --blue-bd:#378add;
+    --amber:#854f0b; --amber-bg:#faeeda; --amber-bd:#ef9f27;
+    --red:#a32d2d; --red-bg:#fcebeb; --red-bd:#e24b4a;
+    --gray-bd:#b4b2a9;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; padding:0; background:var(--bg-3); color:var(--tx);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    font-size:14px; line-height:1.65;
+  }
+  .wrap{max-width:940px; margin:0 auto; padding:28px 20px 60px}
+  header{margin-bottom:22px}
+  h1{font-size:22px; font-weight:500; margin:0 0 6px; letter-spacing:.2px}
+  .sub{color:var(--tx-2); font-size:14px; margin:0}
+  .card{
+    background:var(--bg); border:.5px solid var(--bd); border-radius:12px;
+    padding:18px 20px; margin-bottom:16px;
+  }
+  h2{font-size:15px; font-weight:500; margin:0 0 14px}
+  .grid{display:grid; gap:12px}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+  label.f{display:block; font-size:12px; color:var(--tx-2); margin-bottom:5px}
+  input[type=range]{width:100%; margin:4px 0 0}
+  input[type=number],input[type=text],select{
+    width:100%; padding:7px 9px; font-size:14px; font-family:inherit;
+    background:var(--bg); color:var(--tx);
+    border:.5px solid var(--bd-2); border-radius:8px;
+  }
+  .val{font-variant-numeric:tabular-nums; color:var(--tx); font-weight:500}
+  table{width:100%; border-collapse:collapse; font-size:13px; table-layout:fixed}
+  th,td{text-align:left; padding:8px 6px; border-bottom:.5px solid var(--bd); vertical-align:top}
+  th{color:var(--tx-2); font-weight:500; font-size:12px}
+  td.num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap}
+  .verdict{
+    border-radius:12px; padding:16px 18px; margin-bottom:16px;
+    border:.5px solid var(--bd); background:var(--bg);
+  }
+  .verdict.pick{background:var(--teal-bg); border-color:var(--teal-bd)}
+  .verdict.tie{background:var(--amber-bg); border-color:var(--amber-bd)}
+  .verdict .tag{
+    display:inline-block; font-size:12px; padding:3px 10px; border-radius:20px;
+    background:rgba(0,0,0,.06); margin-bottom:8px; color:var(--tx-2);
+  }
+  .verdict.pick .tag{background:var(--teal-bd); color:#fff}
+  .verdict.tie .tag{background:var(--amber-bd); color:#fff}
+  .verdict .big{font-size:19px; font-weight:500; margin:0 0 6px}
+  .verdict p{margin:0; font-size:13px; color:var(--tx-2)}
+  .metric{background:var(--bg-2); border-radius:8px; padding:12px 14px}
+  .metric .lb{font-size:12px; color:var(--tx-2); margin-bottom:3px}
+  .metric .nm{font-size:22px; font-weight:500; font-variant-numeric:tabular-nums}
+  .chip{
+    display:inline-block; font-size:11px; padding:2px 8px; border-radius:20px;
+    border:.5px solid var(--bd-2); color:var(--tx-2); margin-right:4px;
+  }
+  .chip.del{background:var(--red-bg); border-color:var(--red-bd); color:var(--red)}
+  .chip.pick{background:var(--blue-bg); border-color:var(--blue-bd); color:var(--blue)}
+  .chip.any{background:var(--bg-3); border-color:var(--gray-bd); color:var(--tx-2)}
+  .note{font-size:12px; color:var(--tx-3); margin-top:12px; line-height:1.6}
+  .note code{background:var(--bg-3); padding:1px 5px; border-radius:4px; font-size:11px}
+  .btn{
+    padding:8px 16px; font-size:13px; font-family:inherit; cursor:pointer;
+    background:var(--bg); color:var(--tx); border:.5px solid var(--bd-2); border-radius:8px;
+  }
+  .btn:hover{background:var(--bg-2)}
+  .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+  .banner{
+    background:var(--amber-bg); border:.5px solid var(--amber-bd); border-radius:8px;
+    padding:10px 14px; font-size:12px; color:var(--amber); margin-bottom:16px;
+  }
+  footer{font-size:12px; color:var(--tx-3); margin-top:24px; line-height:1.7}
+  a{color:var(--blue)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>麦门渠道官 · 在线试算</h1>
+  <p class="sub">拖动参数，看「点外送」和「到店自取」到底哪个更划算。计算逻辑与仓库里的 <code>decider.py</code> 完全一致。</p>
+</header>
+
+<div class="banner">
+  本页为<strong>离线演示</strong>：使用样例数据，不连接麦当劳接口、不读取你的账户。真实数据需在本地配置 MCP Token 后运行 <code>mcp_probe.py</code>。
+</div>
+
+<div class="verdict" id="verdict">
+  <span class="tag">计算中</span>
+  <p class="big" id="vBig">—</p>
+  <p id="vText">—</p>
+</div>
+
+<div class="card">
+  <h2>这一顿吃什么</h2>
+  <div class="grid g3">
+    <div>
+      <label class="f" for="itemName">餐品</label>
+      <input type="text" id="itemName" value="巨无霸套餐（中薯+中可）">
+    </div>
+    <div>
+      <label class="f" for="itemPrice">单价（元）</label>
+      <input type="number" id="itemPrice" value="47" min="0" step="1">
+    </div>
+    <div>
+      <label class="f" for="itemQty">份数</label>
+      <input type="number" id="itemQty" value="1" min="1" step="1">
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>外送条件</h2>
+  <div class="grid g3">
+    <div>
+      <label class="f" for="fee">配送费（元）<span class="val" id="feeV"></span></label>
+      <input type="range" id="fee" min="0" max="30" step="1" value="9">
+    </div>
+    <div>
+      <label class="f" for="minOrder">起送价（元）</label>
+      <input type="number" id="minOrder" value="20" min="0" step="1">
+    </div>
+    <div>
+      <label class="f" for="prepD">等餐时间（分钟）<span class="val" id="prepDV"></span></label>
+      <input type="range" id="prepD" min="0" max="60" step="1" value="25">
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>到店条件</h2>
+  <div class="grid g3">
+    <div>
+      <label class="f" for="prepP">出餐时间（分钟）<span class="val" id="prepPV"></span></label>
+      <input type="range" id="prepP" min="0" max="40" step="1" value="8">
+    </div>
+    <div>
+      <label class="f" for="travel">往返门店（分钟）<span class="val" id="travelV"></span></label>
+      <input type="range" id="travel" min="0" max="90" step="5" value="20">
+    </div>
+    <div>
+      <label class="f" for="mc">每分钟时间成本（元）<span class="val" id="mcV"></span></label>
+      <input type="range" id="mc" min="0" max="2" step="0.01" value="0.5">
+    </div>
+  </div>
+  <p class="note">时间成本 = 等待分钟数 × 每分钟折算金额。0 表示「不在乎时间」；1.67 约等于时薪 100 元。<strong>这个参数会改变结论</strong>——同一顿餐，对时间敏感和不敏感的人答案不同。</p>
+</div>
+
+<div class="card">
+  <h2>你的券</h2>
+  <p class="note" style="margin-top:0">注意最后一张：<strong>到店券在外送场景根本用不了</strong>。这是多数省钱助手会算错的地方。</p>
+  <table>
+    <thead><tr><th style="width:38%">券</th><th style="width:14%">抵扣</th><th style="width:14%">门槛</th><th style="width:20%">适用渠道</th><th style="width:14%">开关</th></tr></thead>
+    <tbody id="couponRows"></tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>计价拆解</h2>
+  <table>
+    <thead><tr><th style="width:26%">项目</th><th style="width:37%">外送</th><th style="width:37%">到店自取</th></tr></thead>
+    <tbody id="breakdown"></tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>券体检</h2>
+  <table>
+    <thead><tr><th style="width:36%">券</th><th style="width:16%">名义面额</th><th style="width:24%">实际能用</th><th style="width:24%">结论</th></tr></thead>
+    <tbody id="audit"></tbody>
+  </table>
+</div>
+
+<footer>
+  <strong>麦门渠道官 McRoute</strong> · 麦当劳程序员节创意开发大赛参赛作品 · 非麦当劳官方产品<br>
+  零依赖 · 纯 Python 标准库 · <a href="https://github.com/swing-yu/mcd-route">开源地址</a> ·
+  觉得有用请点个 Star ⭐<br>
+  券面规则、价格与供应状态以麦当劳官方渠道实时结果为准。页面输出仅供参考，不构成专业建议。
+</footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var COUPONS = [
+    {id:"C-STORE-15", name:"门店券 满40减15", discount:15, threshold:40, channel:"pickup", on:true},
+    {id:"C-ANY-6",    name:"通用券 减6元",     discount:6,  threshold:0,  channel:"any",    on:true},
+    {id:"C-MAI-9",    name:"麦麦省 免配送费券", discount:9, threshold:30, channel:"delivery", on:true}
+  ];
+
+  var $ = function(id){ return document.getElementById(id); };
+  var fmt = function(n){ return Math.abs(n - Math.round(n)) < 0.005 ? String(Math.round(n)) : n.toFixed(2); };
+
+  // ---- 以下计算逻辑与 decider.py 保持一致 ----
+  function bestCoupon(coupons, channelKey, amount){
+    var best = 0, name = "无可用券";
+    for (var i=0;i<coupons.length;i++){
+      var c = coupons[i];
+      if (!c.on) continue;
+      if (c.channel !== "any" && c.channel !== channelKey) continue;
+      if (amount < c.threshold) continue;
+      if (c.discount > best){ best = c.discount; name = c.name; }
+    }
+    return {amount:best, name:name};
+  }
+
+  function channelTotal(ch, goods, minuteCost){
+    var bc = bestCoupon(ch.coupons, ch.key, goods);
+    var after = Math.max(goods - bc.amount, 0);
+    var total = after + ch.fee;
+    var minutes = ch.key === "pickup" ? ch.travel + ch.prep : ch.prep;
+    var timeCost = minutes * minuteCost;
+    return {
+      key:ch.key, label:ch.label, goods:goods,
+      discount:bc.amount, coupon:bc.name,
+      fee:ch.fee, total:total,
+      minutes:minutes, timeCost:timeCost,
+      grand:total + timeCost,
+      minOrder:ch.minOrder, met: goods >= ch.minOrder,
+      available: goods >= ch.minOrder
+    };
+  }
+
+  function compare(d, p){
+    if (!d.available && !p.available) return {pick:"none", big:"两个渠道都不行", text:"起送价都没达到，或没有可选门店。"};
+    if (p.available && !d.available) return {pick:"pickup", big:"建议到店自取", text:"外送不可用（未达起送价），到店可行。"};
+    if (d.available && !p.available) return {pick:"delivery", big:"建议点外送", text:"到店不可用，外送可行。"};
+    var gap = d.grand - p.grand;
+    if (Math.abs(gap) < 1){
+      var cheaper = d.total < p.total ? "外送" : (p.total < d.total ? "到店" : "两者");
+      return {pick:"tie", big:cheaper+"（到手价几乎持平）",
+        text:"两渠道到手价基本相同（外送 ¥"+fmt(d.total)+" / 到店 ¥"+fmt(p.total)+"），但总成本差 ¥"+fmt(Math.abs(gap))+"（含时间成本折算）。按你的时间单价算，"+(gap>0?"到店更划算":"外送更划算")+"。"};
+    }
+    if (gap > 0) return {pick:"pickup", big:"建议到店自取",
+      text:"到店到手价 ¥"+fmt(p.total)+"，比外送 ¥"+fmt(d.total)+" 少 ¥"+fmt(d.total-p.total)+"；算上往返 "+p.minutes+" 分钟的时间成本后，仍净省 ¥"+fmt(gap)+"。"};
+    return {pick:"delivery", big:"建议点外送",
+      text:"外送到手价 ¥"+fmt(d.total)+"，比到店 ¥"+fmt(p.total)+" 少 ¥"+fmt(p.total-d.total)+"；算上等餐 "+d.minutes+" 分钟的时间成本后，仍净省 ¥"+fmt(Math.abs(gap))+"。"};
+  }
+  // ---- 计算逻辑结束 ----
+
+  function renderCoupons(){
+    var tb = $("couponRows"), html = "";
+    for (var i=0;i<COUPONS.length;i++){
+      var c = COUPONS[i];
+      var chLabel = c.channel === "any" ? "两渠道通用" : (c.channel === "pickup" ? "仅到店" : "仅外送");
+      var chClass = c.channel === "any" ? "any" : (c.channel === "pickup" ? "pick" : "del");
+      html += "<tr>"
+        + "<td>"+c.name+"</td>"
+        + "<td class='num'>¥"+fmt(c.discount)+"</td>"
+        + "<td class='num'>"+(c.threshold>0 ? "¥"+fmt(c.threshold) : "无")+"</td>"
+        + "<td><span class='chip "+chClass+"'>"+chLabel+"</span></td>"
+        + "<td><label style='font-size:12px;color:var(--tx-2);cursor:pointer;display:flex;align-items:center;gap:6px'>"
+        + "<input type='checkbox' data-ci='"+i+"'"+(c.on?" checked":"")+"> 启用</label></td>"
+        + "</tr>";
+    }
+    tb.innerHTML = html;
+    var boxes = tb.querySelectorAll("input[type=checkbox]");
+    for (var j=0;j<boxes.length;j++){
+      boxes[j].addEventListener("change", function(ev){
+        var idx = parseInt(ev.target.getAttribute("data-ci"),10);
+        COUPONS[idx].on = ev.target.checked;
+        render();
+      });
+    }
+  }
+
+  function render(){
+    var price = parseFloat($("itemPrice").value) || 0;
+    var qty = Math.max(parseInt($("itemQty").value,10)||1, 1);
+    var goods = Math.round(price*qty*100)/100;
+
+    var fee = parseFloat($("fee").value);
+    var minOrder = parseFloat($("minOrder").value)||0;
+    var prepD = parseInt($("prepD").value,10);
+    var prepP = parseInt($("prepP").value,10);
+    var travel = parseInt($("travel").value,10);
+    var mc = parseFloat($("mc").value);
+
+    $("feeV").textContent = "¥"+fmt(fee);
+    $("prepDV").textContent = prepD+" 分钟";
+    $("prepPV").textContent = prepP+" 分钟";
+    $("travelV").textContent = travel+" 分钟";
+    $("mcV").textContent = "¥"+fmt(mc)+"/分钟";
+
+    var d = channelTotal({key:"delivery",label:"外送",coupons:COUPONS,fee:fee,minOrder:minOrder,prep:prepD,travel:0}, goods, mc);
+    var p = channelTotal({key:"pickup",label:"到店自取",coupons:COUPONS,fee:0,minOrder:0,prep:prepP,travel:travel}, goods, mc);
+    var v = compare(d,p);
+
+    var box = $("verdict");
+    box.className = "verdict " + (v.pick==="none" ? "" : v.pick);
+    $("vBig").textContent = v.big;
+    $("vText").textContent = v.text;
+
+    var rows = [
+      ["商品原价", "¥"+fmt(d.goods), "¥"+fmt(p.goods)],
+      ["用券抵扣", (d.discount>0? "−¥"+fmt(d.discount) : "¥0")+"　"+d.coupon, (p.discount>0? "−¥"+fmt(p.discount) : "¥0")+"　"+p.coupon],
+      ["配送费", "¥"+fmt(d.fee), "¥0"],
+      ["到手价", "¥"+fmt(d.total), "¥"+fmt(p.total)],
+      ["时间成本", d.minutes+" 分钟 → ¥"+fmt(d.timeCost), p.minutes+" 分钟 → ¥"+fmt(p.timeCost)],
+      ["总成本", "¥"+fmt(d.grand), "¥"+fmt(p.grand)],
+      ["是否可下单", d.available ? "可以" : "未达起送价 ¥"+fmt(d.minOrder), "可以"]
+    ];
+    var bh = "";
+    for (var i=0;i<rows.length;i++){
+      var hl = (i===3 || i===5);
+      bh += "<tr"+(hl?" style='font-weight:500;background:var(--bg-2)'":"")+">"
+        + "<td>"+rows[i][0]+"</td><td class='num'>"+rows[i][1]+"</td><td class='num'>"+rows[i][2]+"</td></tr>";
+    }
+    $("breakdown").innerHTML = bh;
+
+    var ah = "";
+    for (var k=0;k<COUPONS.length;k++){
+      var c = COUPONS[k];
+      var okP = c.channel==="any"||c.channel==="pickup" ? (goods>=c.threshold) : false;
+      var okD = c.channel==="any"||c.channel==="delivery" ? (goods>=c.threshold) : false;
+      var use = okP||okD ? "可用" : (goods<c.threshold ? "未达门槛" : "渠道不适用");
+      var concl = !c.on ? "未启用" : (c.channel==="any" ? "两渠道都能用" : (c.channel==="pickup" ? "仅到店可用" : "仅外送可用"));
+      ah += "<tr><td>"+c.name+"</td><td class='num'>¥"+fmt(c.discount)+"</td>"
+        + "<td>"+use+"</td><td style='color:var(--tx-2)'>"+concl+"</td></tr>";
+    }
+    $("audit").innerHTML = ah;
+  }
+
+  var ids = ["itemPrice","itemQty","fee","minOrder","prepD","prepP","travel","mc"];
+  for (var i=0;i<ids.length;i++){
+    var el = $(ids[i]);
+    el.addEventListener("input", render);
+    el.addEventListener("change", render);
+  }
+  $("itemName").addEventListener("input", function(){
+    var n = $("itemName").value.trim();
+    var m = {"巨无霸套餐（中薯+中可）":47,"麦辣鸡腿堡":22,"麦咖啡（冰美式）":9,"板烧鸡腿堡":24.5,"薯条（中）":11,"派（香芋）":7.5};
+    if (m[n] !== undefined) $("itemPrice").value = m[n];
+    render();
+  });
+
+  renderCoupons();
+  render();
+})();
+</script>
+</body>
+</html>

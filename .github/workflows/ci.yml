@@ -16,11 +16,18 @@ jobs:
         with:
           python-version: '3.8'
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: 语法检查
         run: python -m py_compile skills/mcd-route/scripts/*.py
 
       - name: 运行自测套件
         run: python skills/mcd-route/scripts/selftest.py
+
+      - name: 前后端对拍（页面与 CLI 逻辑一致性）
+        run: python skills/mcd-route/scripts/parity_check.py
 
       - name: 离线跑通完整决策流程
         run: python skills/mcd-route/scripts/decider.py --pretty

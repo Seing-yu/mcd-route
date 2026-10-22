@@ -119,6 +119,46 @@ def money(value: float) -> str:
     return f"{sign}{body}"
 
 
+# ------------------------------------------------------------------ 单位归一化
+#
+# 【实测坑 · 必读】麦当劳 MCP 的金额单位**按工具区分**，不能一概处理：
+#   · calculate-price 返回的价格字段是「分」（无引号整数），需除以 100
+#   · query-meals / query-meal-detail / create-order / query-order
+#     以及麦麦商城订单返回的金额已是「元」（字符串），直接用
+#   · 积分字段（points / totalPoints 等）不按金额换算
+#
+# 本项目所有内部计算统一使用「元」。因此：
+#   - 菜单价格来自 query-meals，天然是元，直接用；
+#   - 配送费/起送价来自 calculate-price，是分，必须转换。
+#
+# 混用会导致每个金额差 100 倍——这是最容易发生也最难发现的错误。
+# 参见 references/mcp-tools.md「金额单位契约」一节。
+
+FEN_PER_YUAN = 100
+
+
+def fen_to_yuan(value) -> float:
+    """把「分」转换成「元」。仅用于 calculate-price 返回的价格字段。"""
+    try:
+        return round(float(value) / FEN_PER_YUAN, 2)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def to_yuan(value, unit: str = "yuan") -> float:
+    """按指定单位归一化成「元」。
+
+    unit="fen"  -> 除以 100（calculate-price 的价格字段）
+    unit="yuan" -> 原值（query-meals 等已是元的字段）
+    """
+    if unit == "fen":
+        return fen_to_yuan(value)
+    try:
+        return round(float(value), 2)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def best_coupon(coupons: Iterable[Coupon], channel_key: str, amount: float) -> tuple[float, str, list[str]]:
     """在给定渠道和金额下，选出抵扣最多的那一张券。
 
@@ -334,7 +374,10 @@ def coupon_audit(coupons: list[Coupon], basket_total: float) -> list[dict]:
 
 
 def build_basket(items: Iterable[dict]) -> list[BasketItem]:
-    """从 MCP 菜单数据构造购物篮。"""
+    """从 MCP 菜单数据构造购物篮。
+
+    菜单来自 `query-meals`，其金额字段已是「元」，直接使用，不做单位换算。
+    """
     basket: list[BasketItem] = []
     for raw in items or []:
         if not isinstance(raw, dict):
@@ -345,6 +388,8 @@ def build_basket(items: Iterable[dict]) -> list[BasketItem]:
             continue
         name = str(raw.get("name") or raw.get("itemName") or code)
         price = raw.get("price")
+        if price is None:
+            price = raw.get("currentPrice") or raw.get("salePrice") or raw.get("originalPrice")
         try:
             price = float(price)
         except (TypeError, ValueError):
@@ -352,6 +397,51 @@ def build_basket(items: Iterable[dict]) -> list[BasketItem]:
         qty = int(raw.get("qty") or raw.get("count") or 1)
         basket.append(BasketItem(code=code, name=name, price=price, qty=qty))
     return basket
+
+
+def parse_calculate_price(raw: dict) -> dict:
+    """解析 `calculate-price` 的返回，**统一换算成「元」**。
+
+    【实测坑】calculate-price 的价格字段单位是「分」，与 query-meals 的「元」相反。
+    这里的每个金额字段都必须经过 `fen_to_yuan()`，否则会差 100 倍。
+
+    返回统一结构：{goods, delivery_fee, discount, total, min_order, unit_converted}
+    解析不到的字段一律给 0 并在 notes 中说明，不猜、不估算。
+    """
+    notes: list[str] = []
+    if not isinstance(raw, dict):
+        return {
+            "goods": 0.0, "delivery_fee": 0.0, "discount": 0.0, "total": 0.0,
+            "min_order": 0.0, "notes": ["calculate-price 未返回可解析的结构"],
+        }
+
+    def pick(*names):
+        for name in names:
+            if name in raw and raw[name] is not None:
+                return raw[name]
+        return None
+
+    def as_fen(value, label):
+        if value is None:
+            notes.append(f"{label} 未返回，本次不计入")
+            return 0.0
+        return fen_to_yuan(value)
+
+    goods = as_fen(pick("goodsPrice", "goodsAmount", "productPrice", "totalPrice"),
+                   "商品金额")
+    delivery_fee = as_fen(pick("deliveryFee", "shippingFee", "deliveryPrice"), "配送费")
+    discount = as_fen(pick("discountAmount", "discount", "preferAmount"), "优惠金额")
+    total = as_fen(pick("payAmount", "totalAmount", "shouldPay", "actualAmount"), "应付总价")
+    min_order = as_fen(pick("minOrderAmount", "minDeliveryAmount", "minOrder"), "起送价")
+
+    return {
+        "goods": goods,
+        "delivery_fee": delivery_fee,
+        "discount": discount,
+        "total": total,
+        "min_order": min_order,
+        "notes": notes,
+    }
 
 
 def run_scenario(scenario: dict, minute_cost: float = DEFAULT_MINUTE_COST) -> dict:

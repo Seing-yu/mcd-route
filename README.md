@@ -5,7 +5,7 @@
 >
 > 麦当劳程序员创意开发大赛参赛作品 · 非麦当劳官方产品。
 
-![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![自测](https://img.shields.io/badge/selftest-53%20passed-success) ![License](https://img.shields.io/badge/license-MIT-green)
+![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![自测](https://img.shields.io/badge/selftest-73%20passed-success) ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
@@ -33,6 +33,24 @@
 | 麦当劳 MCP | 实时门店、菜单、券、价格、配送费、起送价 |
 | `scripts/decider.py` | 确定性渠道计价与对比，输出可执行建议 |
 | WorkBuddy Agent | 理解需求、编排调用、讲解方案、确认后下单 |
+
+---
+
+## 🎮 在线试算（无需登录，浏览器打开即玩）
+
+**→ <https://swing-yu.github.io/mcd-route/>**
+
+拖动配送费、起送价、等待时间、**每分钟时间成本**，实时看出哪个渠道更划算；
+勾掉某张券，立刻看到结论怎么变。
+
+> 页面上的计算逻辑是 `decider.py` 的**同一套实现**，
+> `scripts/parity_check.py` 会逐场景对拍两端结果（56 项比对）防止漂移。
+>
+> 页面使用样例数据，不连接麦当劳接口、不读取你的任何账户信息。
+> 想用真实数据请在本地配置 Token 后运行 `mcp_probe.py`。
+
+**最容易踩的坑，页面里可以直接看到**：把「门店券 满40减15」勾上，
+外送场景下它**根本用不了**——这正是多数省钱助手会算错的地方。
 
 ---
 
@@ -155,8 +173,11 @@ python decider.py --pretty
 python decider.py --minute-cost 0
 python decider.py --minute-cost 1.67
 
-# 跑 53 项自测（改逻辑后必跑）
+# 跑 73 项自测（改逻辑后必跑）
 python selftest.py
+
+# 前后端对拍：验证在线试算页与 CLI 结果一致（需 Node）
+python parity_check.py
 
 # 真实 MCP 连通自检（需 Token，证明数据链路是真的）
 export MCD_MCP_TOKEN=你的token
@@ -171,7 +192,7 @@ python mcp_probe.py --call query-nearby-stores --args '{"address":"北京市朝�
 | 项目 | 性质 | 说明 |
 |---|---|---|
 | MCP 客户端握手 | ✅ 真实 | `mcp_probe.py` 可现场验证 Token 握手 + 工具清单 + 试调用 |
-| 渠道计价与对比 | ✅ 真实 | `decider.py` 纯标准库实现，53 项自测覆盖各决策分支 |
+| 渠道计价与对比 | ✅ 真实 | `decider.py` 纯标准库实现，73 项自测覆盖各决策分支 |
 | 「省 13.5 元」结论 | ✅ 真实 | 算法在样例数据上算出，非人工编排 |
 | 券的渠道限制 | ✅ 真实 | 券的 `channel` 字段严格参与计算，跨渠道券被剔除 |
 | 配送费 / 起送价 | 🟡 示例快照 | 取自 `calculate-price` 的返回结构，数值用于演示，以实时返回为准 |
@@ -257,21 +278,27 @@ python mcp_probe.py --call query-nearby-stores --args '{"address":"北京市朝�
 .
 ├── README.md                      # 本文件
 ├── CONTEST_DECLARATION.md         # 参赛声明（官方原文，未改动）
-├── MCP_INTEGRATION.md             # MCP 集成说明：Tool 清单 / 调用流程 / 业务价值
+├── MCP_INTEGRATION.md             # MCP 集成说明：Tool 清单 / 调用流程 / 业务价值 / 规则对照
 ├── mcp-config.example.json        # 脱敏 MCP 配置（仅环境变量占位符）
 ├── workbuddy.md                   # WorkBuddy 开发对话上下文
 ├── LICENSE                        # MIT
+├── docs/
+│   ├── index.html                 # ← 在线试算页（单文件，零外部依赖）
+│   ├── 推广物料.md                 # 冲 Star 用：长文骨架 / 短文案 / 话术 / 节奏表
+│   └── mcp-rules-20251203.html    # 官方 MCP 服务规则原文快照
 └── skills/mcd-route/              # ← Skill 本体
     ├── SKILL.md                   # 技能指令（Agent 加载）
     ├── scripts/
-    │   ├── mcp_client.py          # 纯标准库 MCP 客户端（握手/工具列表/调用）
-    │   ├── decider.py             # 决策引擎：渠道计价、对比、券体检
-    │   ├── selftest.py            # 53 项自测
+    │   ├── mcp_client.py          # 纯标准库 MCP 客户端（握手/工具列表/调用/合规护栏）
+    │   ├── decider.py             # 决策引擎：渠道计价、对比、券体检、单位归一化
+    │   ├── selftest.py            # 73 项自测
+    │   ├── parity_check.py        # 前后端对拍（页面 vs CLI）
+    │   ├── parity_check.mjs       # 前端计算引擎抽取器
     │   ├── mcp_probe.py           # MCP 连通性自检（四层）
     │   └── sample_data/
     │       └── scenario.json      # 离线样例，无需 Token 即可跑通
     └── references/
-        └── mcp-tools.md           # Tool 清单与字段映射 + 实测记录
+        └── mcp-tools.md           # Tool 清单、字段映射、金额单位契约、实测记录
 ```
 
 ---
@@ -284,7 +311,8 @@ python mcp_probe.py --call query-nearby-stores --args '{"address":"北京市朝�
 - **券的场景建模** —— 建模 `channel` 字段，解决「券用不了」这个真实痛点。
 - **保守计价** —— 不叠加券、不猜价格，宁可少报优惠也不给假低价。
 - **诚实降级** —— 起送价未达标、距离不可得、字段缺失，都有明确的降级说明。
-- **53 项自测** —— 覆盖券可用性、选券策略、计价、决策分支、字段归一化五类。
+- **73 项自测** —— 覆盖券可用性、选券策略、计价、决策分支、字段归一化、金额单位契约、合规护栏七类。
+- **前后端对拍** —— 在线试算页与 CLI 是同一套逻辑，逐场景比对 56 项，防止漂移。
 
 ---
 

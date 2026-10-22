@@ -74,6 +74,10 @@ query-meal-detail {itemCode}     # 需要套餐明细时
 配送费与起送价来自 `calculate-price` 的返回（它会给出商品金额、配送费、优惠金额、应付总价）。
 **不要自己猜配送费。**
 
+> ⚠️ **金额单位陷阱**：`calculate-price` 的金额是**分**，`query-meals` 的是**元**。
+> 混用会让每个金额差 100 倍。整理数据时用 `decider.py` 的
+> `parse_calculate_price()` 转换，不要手动除。
+
 ### 第 4 步 · 交给脚本算
 
 把第 1-3 步拿到的原始数据整理成 JSON，调用决策引擎：
@@ -117,24 +121,34 @@ python scripts/decider.py --scenario <scenario.json> --minute-cost 0.5
 
 ## 关键实测经验
 
-以下是通过真实 MCP 联调得到的认知，直接影响正确性：
+以下是通过真实 MCP 联调得到的认知，直接影响正确性。
+**这些坑官方文档不会写**，必须靠实测撞出来：
 
-1. **券有场景属性**：实测部分门店券仅到店可用。外送场景必须剔除这些券，
+1. **金额单位按工具区分**：只有 `calculate-price` 返回「分」，
+   `query-meals` / `query-meal-detail` / `create-order` 已是「元」。
+   混用会让每个金额差 100 倍。用 `parse_calculate_price()` 统一转换。
+2. **券有场景属性**：实测部分门店券仅到店可用。外送场景必须剔除这些券，
    否则会报出实际用不了的低价。
-2. **券要四路查全**：`available-coupons` 里的券要先 `auto-bind-coupons` 领，
+3. **券要四路查全**：`available-coupons` 里的券要先 `auto-bind-coupons` 领，
    不领就不在 `query-my-coupons` 里。
-3. **门店券绑门店**：换一家门店取到的券完全不同，所以**两个渠道要分别查券**。
-4. **起送价是硬约束**：外送未达起送价就不可用，到店没有这个限制。
-5. **历史订单可能为空**：新账号 `order-list` 返回空列表，依赖它的功能要有空态兜底。
-6. **只取最优单张券，不叠券**：本 Skill 刻意不做券组合叠加，保守计价，
-   保证报出的价格一定能真实成交。
+4. **门店券绑门店**：换一家门店取到的券完全不同，所以**两个渠道要分别查券**。
+5. **起送价是硬约束**：外送未达起送价就不可用，到店没有这个限制。
+6. **历史订单可能为空**：新账号 `order-list` 返回空列表，依赖它的功能要有空态兜底。
+7. **响应不一定是纯 JSON**：部分 Tool 返回「散文说明 + 内嵌 JSON」的混合文本，
+   要先提取 JSON 再解析。
+8. **`query-nearby-stores` 参数联动**：`searchType=2` 时 `city` 与 `keyword`
+   必须成对提供。
+9. **券要作为独立 item 参与算价**：引用券需以独立商品项传入
+   `{productCode, quantity:1, couponId, couponCode}`，挂在普通餐品上无效。
+10. **只取最优单张券，不叠券**：本 Skill 刻意不做券组合叠加，保守计价，
+    保证报出的价格一定能真实成交。
 
 ## 文件说明
 
 ```
 scripts/mcp_client.py   纯标准库 MCP 客户端（握手 / tools/list / tools/call）
 scripts/decider.py      决策引擎：渠道计价、对比、券体检
-scripts/selftest.py     53 项自测，改逻辑后必跑
+scripts/selftest.py     73 项自测，改逻辑后必跑
 scripts/mcp_probe.py    连通性自检：证明数据链路是真的
 scripts/sample_data/    离线样例，无需 Token 即可跑通全流程
 references/mcp-tools.md Tool 清单与字段映射

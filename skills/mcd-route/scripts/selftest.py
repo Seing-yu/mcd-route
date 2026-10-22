@@ -24,7 +24,10 @@ from decider import (  # noqa: E402
     collect_channel_coupons,
     compare,
     coupon_audit,
+    fen_to_yuan,
     money,
+    parse_calculate_price,
+    to_yuan,
 )
 from mcp_client import (  # noqa: E402
     MAX_CALLS_PER_SESSION,
@@ -206,6 +209,56 @@ check("购物篮过滤脏数据", len(basket) == 2, f"{len(basket)}")
 check("qty 生效", basket[0].total == 40.0, f"{basket[0].total}")
 check("字段名兼容 itemCode", basket[1].code == "2")
 check("缺 qty 默认为1", basket[1].qty == 1)
+
+
+# ---------------------------------------------------------------- 金额单位契约
+# 【实测坑】calculate-price 的金额单位是「分」，query-meals 等是「元」。
+# 混用会导致每个金额差 100 倍。以下用例锁定归一化行为。
+
+check("分转元：11450 -> 114.5", fen_to_yuan(11450) == 114.5, str(fen_to_yuan(11450)))
+check("分转元：900 -> 9.0", fen_to_yuan(900) == 9.0, str(fen_to_yuan(900)))
+check("分转元：0 -> 0", fen_to_yuan(0) == 0.0)
+check("分转元：非数字 -> 0", fen_to_yuan("abc") == 0.0)
+check("分转元：None -> 0", fen_to_yuan(None) == 0.0)
+check("to_yuan 按 fen 换算", to_yuan(4700, "fen") == 47.0)
+check("to_yuan 按 yuan 不换算", to_yuan(47.0, "yuan") == 47.0)
+check("to_yuan 支持字符串元", to_yuan("47.00", "yuan") == 47.0)
+
+# calculate-price 解析：分 -> 元
+cp = parse_calculate_price({
+    "goodsPrice": 4700,
+    "deliveryFee": 900,
+    "discountAmount": 1500,
+    "payAmount": 4100,
+    "minOrderAmount": 2000,
+})
+check("calculate-price 商品金额分转元", cp["goods"] == 47.0, str(cp["goods"]))
+check("calculate-price 配送费分转元", cp["delivery_fee"] == 9.0, str(cp["delivery_fee"]))
+check("calculate-price 优惠分转元", cp["discount"] == 15.0, str(cp["discount"]))
+check("calculate-price 应付总价分转元", cp["total"] == 41.0, str(cp["total"]))
+check("calculate-price 起送价分转元", cp["min_order"] == 20.0, str(cp["min_order"]))
+
+# 字段缺失 -> 记 notes，不猜
+cp2 = parse_calculate_price({"goodsPrice": 4700})
+check("缺配送费时为 0", cp2["delivery_fee"] == 0.0)
+check("缺配送费时写入说明", any("配送费" in n for n in cp2["notes"]), str(cp2["notes"]))
+cp3 = parse_calculate_price({})
+check("全空返回 0 且有说明", cp3["total"] == 0.0 and len(cp3["notes"]) > 0)
+cp4 = parse_calculate_price(None)
+check("None 输入不崩溃", cp4["total"] == 0.0)
+
+# 关键回归：菜单价（元）与 calculate-price 价（分）混用时不能差 100 倍
+menu = build_basket([{"code": "1", "name": "巨无霸", "currentPrice": "47.00"}])
+check("菜单价已是元不做换算", menu[0].price == 47.0, str(menu[0].price))
+cp5 = parse_calculate_price({"goodsPrice": 4700, "deliveryFee": 900})
+check("菜单价与核价商品额一致（47 == 47）",
+      abs(menu[0].price - cp5["goods"]) < 0.01,
+      f'{menu[0].price} vs {cp5["goods"]}')
+
+# 端到端：分单位配送费进渠道计价
+ch_fee = mk_channel("delivery", delivery_fee=9.0, prep_minutes=25)
+t_fee = channel_total(ch_fee, BASKET, minute_cost=0.5)
+check("配送费 9 元计入总价", approx(t_fee["total"], 56.0), f"{t_fee['total']}")
 
 
 # ---------------------------------------------------------------- 合规护栏
