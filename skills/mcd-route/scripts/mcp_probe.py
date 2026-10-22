@@ -24,7 +24,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from mcp_client import McpClient, McpError  # noqa: E402
+from mcp_client import McpClient, McpError, resolve_token, token_source  # noqa: E402
 
 # 本项目真正会用到的 Tool，逐一验证是否在线
 REQUIRED_TOOLS = [
@@ -48,12 +48,14 @@ def main() -> int:
     parser.add_argument("--args", default="{}", help="试调用参数（JSON）")
     args = parser.parse_args()
 
-    token = os.environ.get("MCD_MCP_TOKEN", "")
+    token = resolve_token()
     if not token:
         print(
-            "❌ 缺少环境变量 MCD_MCP_TOKEN。\n"
+            "❌ 未配置 MCP Token。\n"
             "   申请地址：https://open.mcd.cn/mcp （手机号登录 → 控制台 → 激活）\n"
-            "   Windows：set MCD_MCP_TOKEN=你的token",
+            "   推荐配置方式（Token 不进入对话，也不进入仓库）：\n"
+            "     echo 你的token > ~/.workbuddy/.mcd_token\n"
+            "   或设置环境变量 MCD_MCP_TOKEN",
             file=sys.stderr,
         )
         return 2
@@ -61,6 +63,7 @@ def main() -> int:
     client = McpClient(token=token)
     report: dict = {"ok": False}
 
+    print(f"0️⃣  凭据来源：{token_source()}（token 本身不回显）")
     print("1️⃣  协议层：initialize 握手…")
     try:
         client.initialize()

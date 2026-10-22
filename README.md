@@ -5,7 +5,7 @@
 >
 > 麦当劳程序员创意开发大赛参赛作品 · 非麦当劳官方产品。
 
-![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![自测](https://img.shields.io/badge/selftest-73%20passed-success) ![License](https://img.shields.io/badge/license-MIT-green)
+![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![自测](https://img.shields.io/badge/selftest-84%20passed-success) ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
@@ -71,11 +71,37 @@ git clone <本仓库> && cp -r skills/mcd-route ~/.workbuddy/skills/
 前往麦当劳 MCP 开放平台 <https://open.mcd.cn/mcp>，用手机号登录后
 在「控制台」点击「激活」，复制 Token。
 
-### 2. 配置 MCP 连接
+### 2. 配置 MCP Token
 
-在 WorkBuddy 左侧边栏【专家·技能·连接器】→【连接器】→ 右上角【自定义连接器】→【配置 MCP】，
-填入 [`mcp-config.example.json`](mcp-config.example.json) 的内容，
+Token 申请地址：<https://open.mcd.cn/mcp>（手机号登录 → 右上角「控制台」→「激活」）。
+
+**推荐：交互式写入本地凭据文件（Token 不经过对话、不进入仓库）**
+
+```bash
+cd skills/mcd-route/scripts
+python setup_token.py
+```
+
+脚本会提示你粘贴 Token（**输入不回显**），写入 `~/.workbuddy/.mcd_token`
+（用户主目录，不在任何 git 仓库内，权限 600）。
+
+也可以直接设置环境变量：
+
+```bash
+export MCD_MCP_TOKEN=你的token   # macOS / Linux
+set MCD_MCP_TOKEN=你的token      # Windows
+```
+
+**在 WorkBuddy 里使用**：左侧边栏【专家·技能·连接器】→【连接器】→
+右上角【自定义连接器】→【配置 MCP】，填入
+[`mcp-config.example.json`](mcp-config.example.json) 的内容，
 把 `${MCD_MCP_TOKEN}` 替换为你的真实 Token（或用环境变量注入），保存后【启用】。
+
+> **为什么推荐用凭据文件而不是把 Token 贴进对话**：
+> MCP Token 与你的麦当劳会员账号强绑定，等同于账号操作权限。
+> 对话内容会经过第三方模型服务商处理，凭据文件则完全在你的机器上。
+> `scripts/selftest.py` 里有一项断言会**扫描整个仓库**，
+> 确认不存在任何真实 Token 形态的字符串。
 
 ### 3. 安装本 Skill
 
@@ -173,14 +199,14 @@ python decider.py --pretty
 python decider.py --minute-cost 0
 python decider.py --minute-cost 1.67
 
-# 跑 73 项自测（改逻辑后必跑）
+# 跑 84 项自测（改逻辑后必跑）
 python selftest.py
 
 # 前后端对拍：验证在线试算页与 CLI 结果一致（需 Node）
 python parity_check.py
 
 # 真实 MCP 连通自检（需 Token，证明数据链路是真的）
-export MCD_MCP_TOKEN=你的token
+python setup_token.py      # 交互式配置 Token（不回显）
 python mcp_probe.py
 python mcp_probe.py --call query-nearby-stores --args '{"address":"北京市朝阳区"}'
 ```
@@ -192,7 +218,7 @@ python mcp_probe.py --call query-nearby-stores --args '{"address":"北京市朝�
 | 项目 | 性质 | 说明 |
 |---|---|---|
 | MCP 客户端握手 | ✅ 真实 | `mcp_probe.py` 可现场验证 Token 握手 + 工具清单 + 试调用 |
-| 渠道计价与对比 | ✅ 真实 | `decider.py` 纯标准库实现，73 项自测覆盖各决策分支 |
+| 渠道计价与对比 | ✅ 真实 | `decider.py` 纯标准库实现，84 项自测覆盖各决策分支 |
 | 「省 13.5 元」结论 | ✅ 真实 | 算法在样例数据上算出，非人工编排 |
 | 券的渠道限制 | ✅ 真实 | 券的 `channel` 字段严格参与计算，跨渠道券被剔除 |
 | 配送费 / 起送价 | 🟡 示例快照 | 取自 `calculate-price` 的返回结构，数值用于演示，以实时返回为准 |
@@ -230,7 +256,7 @@ python mcp_probe.py --call query-nearby-stores --args '{"address":"北京市朝�
 | 个人非商业用途（第一条第 2 项） | 参赛作品，非商业分发；不含任何引流变现 |
 | 禁止批量/自动化调用（第三条第 2 项） | **代码级护栏**：单次会话调用上限 120 次（远低于官方 600/分钟 限流），超出即抛 `ComplianceError` 拒绝执行 |
 | 禁止高频调用（第三条第 2 项） | **强制限速**：两次调用间隔 ≥ 0.35 秒，节奏为交互式而非压测式 |
-| 凭证不得分享/公开（第二条第 2 项） | Token 仅从环境变量 `MCD_MCP_TOKEN` 读取；仓库内只有 `${MCD_MCP_TOKEN}` 占位符；`.gitignore` 已排除 `.env` 与 `mcp-config.json` |
+| 凭证不得分享/公开（第二条第 2 项） | Token 从不进入对话；`setup_token.py` 交互式写入 `~/.workbuddy/.mcd_token`（用户主目录，权限 600）；仓库内只有 `${MCD_MCP_TOKEN}` 占位符；自测含**全仓库 Token 扫描**断言 |
 | 禁止代下单/代领券牟利（第六条第 1 项） | 不提供任何代领券、倒卖、转售功能；`create-order` 仅在用户明确确认后建单，**付款由用户在官方 APP 完成** |
 | 最小必要数据原则（第三条第 1 项） | 只调用渠道决策所必需的 Tool；不读取与决策无关的订单、积分、商城数据 |
 | 隐私（第五条） | 不在对话中索取 Token/密码/证件号；地址等个人数据不完整复述到输出 |
@@ -291,10 +317,11 @@ python mcp_probe.py --call query-nearby-stores --args '{"address":"北京市朝�
     ├── scripts/
     │   ├── mcp_client.py          # 纯标准库 MCP 客户端（握手/工具列表/调用/合规护栏）
     │   ├── decider.py             # 决策引擎：渠道计价、对比、券体检、单位归一化
-    │   ├── selftest.py            # 73 项自测
-    │   ├── parity_check.py        # 前后端对拍（页面 vs CLI）
-    │   ├── parity_check.mjs       # 前端计算引擎抽取器
-    │   ├── mcp_probe.py           # MCP 连通性自检（四层）
+│   ├── selftest.py            # 84 项自测
+│   ├── parity_check.py        # 前后端对拍（页面 vs CLI）
+│   ├── parity_check.mjs       # 前端计算引擎抽取器
+│   ├── setup_token.py         # 交互式配置 Token（不回显，不进对话）
+│   ├── mcp_probe.py           # MCP 连通性自检（四层）
     │   └── sample_data/
     │       └── scenario.json      # 离线样例，无需 Token 即可跑通
     └── references/
@@ -311,7 +338,7 @@ python mcp_probe.py --call query-nearby-stores --args '{"address":"北京市朝�
 - **券的场景建模** —— 建模 `channel` 字段，解决「券用不了」这个真实痛点。
 - **保守计价** —— 不叠加券、不猜价格，宁可少报优惠也不给假低价。
 - **诚实降级** —— 起送价未达标、距离不可得、字段缺失，都有明确的降级说明。
-- **73 项自测** —— 覆盖券可用性、选券策略、计价、决策分支、字段归一化、金额单位契约、合规护栏七类。
+- **84 项自测** —— 覆盖券可用性、选券策略、计价、决策分支、字段归一化、金额单位契约、合规护栏七类。
 - **前后端对拍** —— 在线试算页与 CLI 是同一套逻辑，逐场景比对 56 项，防止漂移。
 
 ---

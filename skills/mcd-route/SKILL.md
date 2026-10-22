@@ -148,7 +148,7 @@ python scripts/decider.py --scenario <scenario.json> --minute-cost 0.5
 ```
 scripts/mcp_client.py   纯标准库 MCP 客户端（握手 / tools/list / tools/call）
 scripts/decider.py      决策引擎：渠道计价、对比、券体检
-scripts/selftest.py     73 项自测，改逻辑后必跑
+scripts/selftest.py     84 项自测，改逻辑后必跑
 scripts/mcp_probe.py    连通性自检：证明数据链路是真的
 scripts/sample_data/    离线样例，无需 Token 即可跑通全流程
 references/mcp-tools.md Tool 清单与字段映射
@@ -158,8 +158,13 @@ references/mcp-tools.md Tool 清单与字段映射
 
 ### 隐私
 
-MCP Token 只从环境变量 `MCD_MCP_TOKEN` 读取，**绝不写进任何文件、绝不回显给用户**。
+MCP Token 只从环境变量 `MCD_MCP_TOKEN` 或本地凭据文件 `~/.workbuddy/.mcd_token` 读取，
+**绝不写进任何文件、绝不回显给用户、绝不接受用户把 Token 贴在对话里**。
 用户地址、订单信息属于个人数据，不要在输出里完整复述。
+
+> 如果用户在对话里贴了 Token：
+> **提醒他立刻去 open.mcd.cn 重新申请**（旧的视为已泄露），
+> 不要把那个 Token 用在任何地方，也不要复述它。
 
 ### 《麦当劳 MCP 服务规则》硬约束
 

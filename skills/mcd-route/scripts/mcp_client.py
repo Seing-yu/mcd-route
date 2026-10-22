@@ -39,6 +39,55 @@ PROTOCOL_CANDIDATES = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 
 CLIENT_INFO = {"name": "mcd-route", "version": "1.0.0"}
 
+# ---------------------------------------------------------------- Token 解析
+#
+# 【安全设计】Token 是与用户麦当劳会员账号强绑定的凭据，等同于账号操作权限。
+# 因此本项目遵循「凭据不经过对话、不进入仓库、不被 Agent 读取」的原则：
+#
+#   1. 环境变量 MCD_MCP_TOKEN      —— CI、临时使用
+#   2. 本地凭据文件 ~/.workbuddy/.mcd_token（首行即 token）—— 本机日常使用
+#   3. 显式传参                       —— 一次性调试
+#
+# 读取顺序即优先级。脚本**只把 token 放进 HTTP 请求头**，绝不打印、绝不写入日志、
+# 绝不回显给用户。注意本文件位于用户主目录，不在任何 git 仓库内。
+
+TOKEN_FILE = os.path.join(
+    os.path.expanduser("~"), ".workbuddy", ".mcd_token"
+)
+
+
+def resolve_token(explicit: str | None = None) -> str:
+    """按优先级解析 MCP Token。找不到时返回空字符串。"""
+    if explicit:
+        return explicit.strip()
+    env_value = os.environ.get("MCD_MCP_TOKEN", "").strip()
+    if env_value:
+        return env_value
+    try:
+        if os.path.isfile(TOKEN_FILE):
+            with open(TOKEN_FILE, encoding="utf-8") as fh:
+                first_line = fh.readline().strip()
+            if first_line:
+                return first_line
+    except OSError:
+        pass
+    return ""
+
+
+def token_source() -> str:
+    """返回 token 的来源标识（不泄露 token 本身）。用于自检报告。"""
+    if os.environ.get("MCD_MCP_TOKEN", "").strip():
+        return "环境变量 MCD_MCP_TOKEN"
+    if os.path.isfile(TOKEN_FILE):
+        try:
+            with open(TOKEN_FILE, encoding="utf-8") as fh:
+                if fh.readline().strip():
+                    return f"本地凭据文件 {TOKEN_FILE}"
+        except OSError:
+            pass
+    return "未配置"
+
+
 # ---------------------------------------------------------------- 合规约束
 #
 # 《麦当劳 MCP 服务规则》第六条禁止行为第 2 项明确禁止
@@ -103,7 +152,7 @@ class McpClient:
         max_retries: int = 3,
         max_calls: int = MAX_CALLS_PER_SESSION,
     ) -> None:
-        self.token = token or os.environ.get("MCD_MCP_TOKEN", "")
+        self.token = resolve_token(token)
         self.url = url or os.environ.get("MCD_MCP_URL", DEFAULT_URL)
         self.timeout = timeout
         self.max_retries = max_retries
@@ -327,11 +376,16 @@ def main() -> int:
     parser.add_argument("--probe", action="store_true", help="只做连通性自检")
     args = parser.parse_args()
 
-    token = os.environ.get("MCD_MCP_TOKEN", "")
+    token = resolve_token()
     if not token:
         print(
             "缺少 MCP Token。请先到 https://open.mcd.cn/mcp 用手机号登录申请，\n"
-            "然后设置环境变量 MCD_MCP_TOKEN。",
+            "然后用以下任一方式配置（推荐第一种，Token 不进入对话也不进入仓库）：\n"
+            f"  1) 把 Token 写入凭据文件：\n"
+            f"     echo 你的token > {TOKEN_FILE}\n"
+            "  2) 设置环境变量：\n"
+            "     set MCD_MCP_TOKEN=你的token   (Windows)\n"
+            "     export MCD_MCP_TOKEN=你的token (macOS/Linux)",
             file=sys.stderr,
         )
         return 2

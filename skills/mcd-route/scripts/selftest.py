@@ -34,6 +34,8 @@ from mcp_client import (  # noqa: E402
     MIN_INTERVAL_SECONDS,
     ComplianceError,
     McpClient,
+    resolve_token,
+    token_source,
 )
 
 PASSED = 0
@@ -282,6 +284,83 @@ except ComplianceError:
 check("握手幂等（不重复发请求）", hasattr(client, "_init_result"))
 check("客户端不内嵌真实 Token", client.token == "dummy")
 check("默认 URL 正确", client.url == "https://mcp.mcd.cn", client.url)
+
+
+# ---------------------------------------------------------------- Token 解析
+# Token 等同于会员账号操作权限。必须保证：
+#   · 优先级正确（显式 > 环境变量 > 凭据文件）
+#   · 来源标识不泄露 token 本身
+#   · 仓库内永远不出现真实 token
+
+import os  # noqa: E402
+import tempfile  # noqa: E402
+
+check("显式参数优先", resolve_token("explicit") == "explicit")
+
+_saved_env = os.environ.pop("MCD_MCP_TOKEN", None)
+check("无任何配置时返回空串", resolve_token() == "", repr(resolve_token()))
+check("未配置时来源标识正确", token_source() == "未配置", token_source())
+
+os.environ["MCD_MCP_TOKEN"] = "env-token"
+check("环境变量被识别", resolve_token() == "env-token")
+check("环境变量来源标识", "MCD_MCP_TOKEN" in token_source(), token_source())
+check("显式参数仍优先于环境变量", resolve_token("explicit") == "explicit")
+
+if _saved_env is not None:
+    os.environ["MCD_MCP_TOKEN"] = _saved_env
+else:
+    os.environ.pop("MCD_MCP_TOKEN", None)
+
+# 凭据文件解析（用临时文件，不碰真实凭据）
+import mcp_client  # noqa: E402
+
+_real_token_file = mcp_client.TOKEN_FILE
+with tempfile.NamedTemporaryFile("w", suffix=".token", delete=False, encoding="utf-8") as fh:
+    fh.write("file-token\nsecond-line-ignored\n")
+    _tmp_path = fh.name
+try:
+    mcp_client.TOKEN_FILE = _tmp_path
+    check("凭据文件被识别", resolve_token() == "file-token", repr(resolve_token()))
+    check("只读首行", resolve_token() != "file-token\nsecond-line-ignored")
+    check("来源标识不泄露 token", "file-token" not in token_source(), token_source())
+    check("来源标识指向文件", ".mcd_token" in token_source() or "token" in token_source().lower())
+finally:
+    mcp_client.TOKEN_FILE = _real_token_file
+    os.unlink(_tmp_path)
+
+# 仓库内不得出现真实 token 形态。
+# 判定方式：找 "Bearer " 后跟一个**足够长且像真实凭据**的字符串。
+# 排除：${VAR} 占位符、<TOKEN> 尖括号说明、{self.token} 代码插值、
+#       YOUR_MCP_TOKEN 之类示例、URL 里的 "Bearer%20" 编码形式。
+import re  # noqa: E402
+
+# 仓库根目录 = scripts -> mcd-route -> skills -> <repo root>
+# 注意必须从 __file__ 起算四级（abspath(__file__) 已含文件名一级），
+# 否则会漏掉 docs/、README.md 等目录——曾经因此让本检查形同虚设。
+_repo_root = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
+_TOKEN_LIKE = re.compile(r"Bearer\s+([A-Za-z0-9_\-\.]{16,})")
+_hits = []
+for _dirpath, _dirnames, _filenames in os.walk(_repo_root):
+    if ".git" in _dirpath or "__pycache__" in _dirpath:
+        continue
+    for _fn in _filenames:
+        _p = os.path.join(_dirpath, _fn)
+        try:
+            with open(_p, encoding="utf-8", errors="ignore") as fh:
+                _content = fh.read()
+        except OSError:
+            continue
+        for _m in _TOKEN_LIKE.finditer(_content):
+            _candidate = _m.group(1)
+            # 占位符与示例不算泄露
+            if any(_candidate.startswith(_a) for _a in ("${", "<", "{", "YOUR_")):
+                continue
+            if "MCD_MCP_TOKEN" in _candidate:
+                continue
+            _hits.append(f"{os.path.relpath(_p, _repo_root)}: {_candidate[:32]}")
+check("仓库内无真实 Token（仅允许占位符）", not _hits, "; ".join(_hits[:3]))
 
 
 # ---------------------------------------------------------------- 输出
