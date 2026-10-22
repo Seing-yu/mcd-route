@@ -26,6 +26,12 @@ from decider import (  # noqa: E402
     coupon_audit,
     money,
 )
+from mcp_client import (  # noqa: E402
+    MAX_CALLS_PER_SESSION,
+    MIN_INTERVAL_SECONDS,
+    ComplianceError,
+    McpClient,
+)
 
 PASSED = 0
 FAILED: list[str] = []
@@ -200,6 +206,29 @@ check("购物篮过滤脏数据", len(basket) == 2, f"{len(basket)}")
 check("qty 生效", basket[0].total == 40.0, f"{basket[0].total}")
 check("字段名兼容 itemCode", basket[1].code == "2")
 check("缺 qty 默认为1", basket[1].qty == 1)
+
+
+# ---------------------------------------------------------------- 合规护栏
+# 《麦当劳 MCP 服务规则》第六条禁止「利用脚本、爬虫或任何自动化工具调用本服务」，
+# 第三条要求「不支持任何形式的批量、高频或自动化调用」。
+# 本项目把该约束做成代码级护栏，以下用例锁定其行为。
+
+check("限速间隔为正", MIN_INTERVAL_SECONDS > 0, str(MIN_INTERVAL_SECONDS))
+check("单会话配额低于官方 600/分钟 限流", MAX_CALLS_PER_SESSION < 600, str(MAX_CALLS_PER_SESSION))
+
+client = McpClient(token="dummy", max_calls=3)
+for _ in range(3):
+    client._account_call()
+check("配额内调用不报错", client.call_count == 3, str(client.call_count))
+try:
+    client._account_call()
+    check("超出配额被拒绝", False, "未抛出 ComplianceError")
+except ComplianceError:
+    check("超出配额被拒绝", True)
+
+check("握手幂等（不重复发请求）", hasattr(client, "_init_result"))
+check("客户端不内嵌真实 Token", client.token == "dummy")
+check("默认 URL 正确", client.url == "https://mcp.mcd.cn", client.url)
 
 
 # ---------------------------------------------------------------- 输出

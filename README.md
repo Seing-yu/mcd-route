@@ -5,7 +5,7 @@
 >
 > 麦当劳程序员创意开发大赛参赛作品 · 非麦当劳官方产品。
 
-![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![自测](https://img.shields.io/badge/selftest-46%20passed-success) ![License](https://img.shields.io/badge/license-MIT-green)
+![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![自测](https://img.shields.io/badge/selftest-53%20passed-success) ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
@@ -155,7 +155,7 @@ python decider.py --pretty
 python decider.py --minute-cost 0
 python decider.py --minute-cost 1.67
 
-# 跑 46 项自测（改逻辑后必跑）
+# 跑 53 项自测（改逻辑后必跑）
 python selftest.py
 
 # 真实 MCP 连通自检（需 Token，证明数据链路是真的）
@@ -171,13 +171,53 @@ python mcp_probe.py --call query-nearby-stores --args '{"address":"北京市朝�
 | 项目 | 性质 | 说明 |
 |---|---|---|
 | MCP 客户端握手 | ✅ 真实 | `mcp_probe.py` 可现场验证 Token 握手 + 工具清单 + 试调用 |
-| 渠道计价与对比 | ✅ 真实 | `decider.py` 纯标准库实现，46 项自测覆盖各决策分支 |
+| 渠道计价与对比 | ✅ 真实 | `decider.py` 纯标准库实现，53 项自测覆盖各决策分支 |
 | 「省 13.5 元」结论 | ✅ 真实 | 算法在样例数据上算出，非人工编排 |
 | 券的渠道限制 | ✅ 真实 | 券的 `channel` 字段严格参与计算，跨渠道券被剔除 |
 | 配送费 / 起送价 | 🟡 示例快照 | 取自 `calculate-price` 的返回结构，数值用于演示，以实时返回为准 |
 | 门店券内容 | 🟡 示例快照 | 结构对齐 `query-store-coupons`，可用性以账号实时状态为准 |
 | 到店往返时间 | 🟡 分档估算 | **MCP 门店接口不返回距离**，按距离分档估算，已在 `SKILL.md` 诚实降级表中声明 |
 | 下单能力 | ✅ 真实 | 经 MCP 核价（`calculate-price`）→ 下单（`create-order`），本仓库页面不涉及下单 |
+
+---
+
+## 费用与合规
+
+### 费用
+
+| 项目 | 规则 |
+|---|---|
+| 平台接入费 | **免费**，无接入服务费、无企业付费套餐（官方 FAQ 原文："No charge"） |
+| Token 申请 | 手机号登录即领，免费 |
+| 调用限流 | 600 次/分钟/Token，超出返回 429 |
+| 实际产生消费的操作 | 仅 `create-order`（付款在官方 APP 完成）、`mall-create-order`（扣积分）、`draw-lottery`（耗积分） |
+| 其余 31 个 Tool | 全部为只读查询，不产生任何费用或权益变动 |
+
+> 唯一的真实成本是你自己的餐饮消费与积分消耗。
+
+### 《麦当劳 MCP 服务规则》遵循说明
+
+本项目完整对照《麦当劳 MCP 服务规则》（版本日期 2025-12-03）执行，
+原文快照存档于 [`docs/mcp-rules-20251203.html`](docs/mcp-rules-20251203.html)。
+
+规则第六条禁止「利用脚本、爬虫或任何自动化工具调用本服务」，
+第三条要求「仅面向个人正常使用场景，不支持任何形式的批量、高频或自动化调用」。
+本项目的立场与实现如下：
+
+| 规则要求 | 本项目做法 |
+|---|---|
+| 个人非商业用途（第一条第 2 项） | 参赛作品，非商业分发；不含任何引流变现 |
+| 禁止批量/自动化调用（第三条第 2 项） | **代码级护栏**：单次会话调用上限 120 次（远低于官方 600/分钟 限流），超出即抛 `ComplianceError` 拒绝执行 |
+| 禁止高频调用（第三条第 2 项） | **强制限速**：两次调用间隔 ≥ 0.35 秒，节奏为交互式而非压测式 |
+| 凭证不得分享/公开（第二条第 2 项） | Token 仅从环境变量 `MCD_MCP_TOKEN` 读取；仓库内只有 `${MCD_MCP_TOKEN}` 占位符；`.gitignore` 已排除 `.env` 与 `mcp-config.json` |
+| 禁止代下单/代领券牟利（第六条第 1 项） | 不提供任何代领券、倒卖、转售功能；`create-order` 仅在用户明确确认后建单，**付款由用户在官方 APP 完成** |
+| 最小必要数据原则（第三条第 1 项） | 只调用渠道决策所必需的 Tool；不读取与决策无关的订单、积分、商城数据 |
+| 隐私（第五条） | 不在对话中索取 Token/密码/证件号；地址等个人数据不完整复述到输出 |
+| 免责（第四条） | README 与 SKILL.md 均声明：AI 生成内容不保证准确，一切以麦当劳 APP 显示为准 |
+
+**调用模式说明**：本项目的 MCP 调用是**人在对话中发起、Agent 按需少量取数**的交互式调用，
+与规则禁止的「无人值守批量爬取」有本质区别——
+每次调用都对应用户的一个具体问题，调用次数受上述配额硬约束。
 
 ---
 
@@ -226,7 +266,7 @@ python mcp_probe.py --call query-nearby-stores --args '{"address":"北京市朝�
     ├── scripts/
     │   ├── mcp_client.py          # 纯标准库 MCP 客户端（握手/工具列表/调用）
     │   ├── decider.py             # 决策引擎：渠道计价、对比、券体检
-    │   ├── selftest.py            # 46 项自测
+    │   ├── selftest.py            # 53 项自测
     │   ├── mcp_probe.py           # MCP 连通性自检（四层）
     │   └── sample_data/
     │       └── scenario.json      # 离线样例，无需 Token 即可跑通
@@ -244,7 +284,7 @@ python mcp_probe.py --call query-nearby-stores --args '{"address":"北京市朝�
 - **券的场景建模** —— 建模 `channel` 字段，解决「券用不了」这个真实痛点。
 - **保守计价** —— 不叠加券、不猜价格，宁可少报优惠也不给假低价。
 - **诚实降级** —— 起送价未达标、距离不可得、字段缺失，都有明确的降级说明。
-- **46 项自测** —— 覆盖券可用性、选券策略、计价、决策分支、字段归一化五类。
+- **53 项自测** —— 覆盖券可用性、选券策略、计价、决策分支、字段归一化五类。
 
 ---
 

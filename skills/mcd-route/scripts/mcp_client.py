@@ -28,6 +28,7 @@ import argparse
 import json
 import os
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -38,9 +39,57 @@ PROTOCOL_CANDIDATES = ("2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05")
 
 CLIENT_INFO = {"name": "mcd-route", "version": "1.0.0"}
 
+# ---------------------------------------------------------------- 合规约束
+#
+# 《麦当劳 MCP 服务规则》第六条禁止行为第 2 项明确禁止
+# 「利用脚本、爬虫或任何自动化工具调用本服务」；
+# 第三条第 2 项要求「仅面向个人正常使用场景，不支持任何形式的批量、高频或自动化调用」。
+#
+# 本项目的立场：MCP 调用是**人在对话中发起、Agent 按需少量取数**的交互式调用，
+# 不是无人值守的批量爬取。为让这一立场可被验证而非口头承诺，代码层面强制：
+#   1. 限速：两次调用之间至少间隔 MIN_INTERVAL_SECONDS；
+#   2. 配额：单次会话的调用总数不超过 MAX_CALLS_PER_SESSION；
+#   3. 拒绝批量：不提供循环批量取数的接口，只支持按名单逐个调用且受上述配额约束。
+#
+# 详见 README「合规说明」与 MCP_INTEGRATION.md「使用规范与禁止行为」。
+
+MIN_INTERVAL_SECONDS = 0.35   # 两次调用最小间隔
+MAX_CALLS_PER_SESSION = 120   # 单次会话调用总数上限（远低于 600/分钟 的官方限流）
+
 
 class McpError(RuntimeError):
     """MCP 调用过程中的可预期错误。"""
+
+
+class ComplianceError(RuntimeError):
+    """触犯《麦当劳 MCP 服务规则》的调用方式时抛出。"""
+
+
+class RateLimiter:
+    """最小间隔限速器，保证调用是交互式节奏而非高频压测。"""
+
+    def __init__(self, min_interval: float = MIN_INTERVAL_SECONDS) -> None:
+        self.min_interval = min_interval
+        self._last = 0.0
+        self._count = 0
+        self._lock = threading.Lock()
+
+    def tick(self) -> int:
+        """计一次调用并返回累计次数，随后执行限速等待。"""
+        with self._lock:
+            self._count += 1
+            count = self._count
+            now = time.monotonic()
+            gap = now - self._last
+            if gap < self.min_interval:
+                time.sleep(self.min_interval - gap)
+            self._last = time.monotonic()
+        return count
+
+    @property
+    def count(self) -> int:
+        """已计数的调用次数。"""
+        return self._count
 
 
 class McpClient:
@@ -52,14 +101,35 @@ class McpClient:
         url: str | None = None,
         timeout: int = 30,
         max_retries: int = 3,
+        max_calls: int = MAX_CALLS_PER_SESSION,
     ) -> None:
         self.token = token or os.environ.get("MCD_MCP_TOKEN", "")
         self.url = url or os.environ.get("MCD_MCP_URL", DEFAULT_URL)
         self.timeout = timeout
         self.max_retries = max_retries
+        self.max_calls = max_calls
+        self._init_result: dict | None = None
+        self._limiter = RateLimiter()
         self.session_id: str | None = None
         self.protocol_version: str | None = None
         self.server_info: dict = {}
+
+    # ------------------------------------------------------------------ 配额
+
+    def _account_call(self) -> None:
+        """计入一次调用并强制限速。超过配额直接拒绝，不静默截断。"""
+        count = self._limiter.tick()
+        if count > self.max_calls:
+            raise ComplianceError(
+                f"单次会话调用次数已达上限 {self.max_calls}。"
+                "《麦当劳 MCP 服务规则》不支持批量/自动化调用，"
+                "请拆分为多次人工发起的查询。"
+            )
+
+    @property
+    def call_count(self) -> int:
+        """本会话已发起的调用次数。"""
+        return self._limiter.count
 
     # ------------------------------------------------------------------ 底层
 
@@ -88,6 +158,8 @@ class McpClient:
         last_error: Exception | None = None
         for attempt in range(1, self.max_retries + 1):
             try:
+                # 每次真实发请求前都要过配额与限速，重试同样计数
+                self._account_call()
                 with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                     # 会话 ID 只在 initialize 的响应头里出现，之后要带上
                     sid = resp.headers.get("Mcp-Session-Id")
@@ -159,7 +231,13 @@ class McpClient:
     # ------------------------------------------------------------------ 协议
 
     def initialize(self) -> dict:
-        """握手。必须在任何 tools/call 之前完成。"""
+        """握手。必须在任何 tools/call 之前完成。
+
+        幂等：已握手过就直接返回缓存结果，不重复发请求。
+        （否则每次 tools/call 都会多出 2 次握手请求。）
+        """
+        if self._init_result is not None:
+            return self._init_result
         for version in PROTOCOL_CANDIDATES:
             result = self._unwrap(
                 self._post(
@@ -187,6 +265,7 @@ class McpClient:
                     "params": {},
                 }
             )
+            self._init_result = result
             return result
         raise McpError("initialize 失败：服务器不接受任何候选协议版本")
 

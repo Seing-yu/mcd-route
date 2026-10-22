@@ -114,7 +114,9 @@ def main() -> int:
             return 1
 
     report["ok"] = True
-    print("\n🎉 全部通过：MCP 链路真实可用。")
+    print(f"\n🎉 全部通过：MCP 链路真实可用。")
+    print(f"   本次会话实际发起 {client.call_count} 次调用"
+          f"（单会话上限 {client.max_calls}，官方限流 600 次/分钟）")
     return 0
 
 

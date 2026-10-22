@@ -134,13 +134,31 @@ python scripts/decider.py --scenario <scenario.json> --minute-cost 0.5
 ```
 scripts/mcp_client.py   纯标准库 MCP 客户端（握手 / tools/list / tools/call）
 scripts/decider.py      决策引擎：渠道计价、对比、券体检
-scripts/selftest.py     46 项自测，改逻辑后必跑
+scripts/selftest.py     53 项自测，改逻辑后必跑
 scripts/mcp_probe.py    连通性自检：证明数据链路是真的
 scripts/sample_data/    离线样例，无需 Token 即可跑通全流程
 references/mcp-tools.md Tool 清单与字段映射
 ```
 
-## 隐私
+## 隐私与合规
+
+### 隐私
 
 MCP Token 只从环境变量 `MCD_MCP_TOKEN` 读取，**绝不写进任何文件、绝不回显给用户**。
 用户地址、订单信息属于个人数据，不要在输出里完整复述。
+
+### 《麦当劳 MCP 服务规则》硬约束
+
+本 Skill 运行时必须遵守《麦当劳 MCP 服务规则》（2025-12-03 版）：
+
+| 规则 | 你必须怎么做 |
+|---|---|
+| 第六条第 1 项：禁止代下单、代领券、倒卖优惠权益牟利 | **绝不主动领券**。`auto-bind-coupons` 只在用户明确说"帮我领券"时调用 |
+| 第三条第 2 项：不支持批量、高频、自动化调用 | **一次对话一个决策**。不要为了"多看几个门店"而循环遍历几十家店——需要比较就取 2-3 家代表性的 |
+| 第三条第 1 项：最小必要数据 | 只取渠道决策必需的 Tool。不查积分、商城、抽奖——那些与本 Skill 无关 |
+| 第五条第 2 项：不得在对话中索取 Token、支付密码、身份证号、银行卡号 | 用户贴了 Token 进来，**提醒他删掉并重新申请**，不要继续使用 |
+| 第二条第 2 项：凭证不得分享或发布到公开网络 | Token 只经环境变量传入，不要写进任何生成的文件或报告 |
+| 第四条：麦当劳不承诺 AI 回复准确性 | 转述券面金额与价格时加一句「以麦当劳 APP 显示为准」 |
+
+**费用认知**：MCP 调用本身免费。真正产生消费的是 `create-order`（付款在官方 APP）、
+`mall-create-order`（扣积分）、`draw-lottery`（耗积分）——这三个都不是本 Skill 的常规路径。
