@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  selftest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.8'
+
+      - name: 语法检查
+        run: python -m py_compile skills/mcd-route/scripts/*.py
+
+      - name: 运行自测套件
+        run: python skills/mcd-route/scripts/selftest.py
+
+      - name: 离线跑通完整决策流程
+        run: python skills/mcd-route/scripts/decider.py --pretty
+
+      - name: 校验必交文件齐全
+        run: |
+          for f in README.md CONTEST_DECLARATION.md MCP_INTEGRATION.md \
+                   mcp-config.example.json workbuddy.md; do
+            if [ ! -f "$f" ]; then echo "❌ 缺少必交文件: $f"; exit 1; fi
+          done
+          echo "✅ 必交文件齐全"
+
+      - name: 校验配置示例只含环境变量占位符
+        run: |
+          if grep -Eq 'Bearer [A-Za-z0-9_-]{20,}' mcp-config.example.json; then
+            echo "❌ 配置示例疑似包含真实 Token"; exit 1
+          fi
+          echo "✅ 配置示例无真实 Token"
+
+      - name: 校验参赛声明与官方原文一致
+        run: |
+          curl -sSL -o /tmp/official.md \
+            https://raw.githubusercontent.com/M-China/mcd-developer-innovation-challenge/main/CONTEST_DECLARATION.md
+          if diff -q /tmp/official.md CONTEST_DECLARATION.md; then
+            echo "✅ 与官方原文逐字节一致"
+          else
+            echo "❌ 与官方原文不一致，请勿修改参赛声明"; exit 1
+          fi

@@ -1,0 +1,30 @@
+{
+  "_comment": "离线样例场景：外送 vs 到店。结构对齐麦当劳 MCP 实际返回，数值用于演示。",
+  "basket": [
+    { "code": "101", "name": "巨无霸套餐（中薯+中可）", "price": 47.0, "qty": 1 }
+  ],
+  "delivery": {
+    "stores": [
+      { "storeCode": "S001", "storeName": "麦当劳（望京SOHO店）", "distance": "medium" }
+    ],
+    "fee": 9.0,
+    "min_order": 20.0,
+    "prep_minutes": 25,
+    "coupons": [
+      { "id": "C-MAI-SHENG-12", "name": "麦麦省 免配送费券", "discount": 9.0, "threshold": 30.0, "channel": "delivery", "source": "query-store-coupons" }
+    ],
+    "notes": []
+  },
+  "pickup": {
+    "stores": [
+      { "storeCode": "S002", "storeName": "麦当劳（阜通门店）", "distance": "close" }
+    ],
+    "prep_minutes": 8,
+    "travel_minutes": 20,
+    "coupons": [
+      { "id": "C-STORE-15", "name": "门店券 满40减15", "discount": 15.0, "threshold": 40.0, "channel": "pickup", "source": "query-store-coupons" },
+      { "id": "C-ANY-6", "name": "通用券 减6元", "discount": 6.0, "threshold": 0.0, "channel": "any", "source": "query-my-coupons" }
+    ],
+    "notes": []
+  }
+}
