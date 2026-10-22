@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 import os
 import sys
@@ -461,6 +462,68 @@ for _dirpath, _dirnames, _filenames in os.walk(_repo_root):
                 continue
             _hits.append(f"{os.path.relpath(_p, _repo_root)}: {_candidate[:32]}")
 check("仓库内无真实 Token（仅允许占位符）", not _hits, "; ".join(_hits[:3]))
+
+
+# ------------------------------------------------------- 第三方可移植性（关键）
+# 参赛项目会被评审 clone 下来用。必须保证：
+#   1. 不含开发者的 Token —— 任何人 clone 后都能用自己的 Token 跑
+#   2. 不含开发者的个人信息（地址、姓名、电话、门店位置）
+# 这两组断言让「可移植性」变成可验证事实，而不是口头承诺。
+
+_src_resolve = inspect.getsource(resolve_token)
+check("Token 从环境变量读取（开发者无关）",
+      "MCD_MCP_TOKEN" in _src_resolve)
+check("Token 解析函数读凭据文件", "TOKEN_FILE" in _src_resolve)
+check("Token 解析不硬编码任何字面量",
+      "Bearer" not in _src_resolve, "解析函数里不应出现 Bearer 字面量")
+
+# 客户端默认从 resolve_token 取，不从命令行参数硬编码
+_src_client = inspect.getsource(McpClient.__init__)
+check("客户端 Token 来自 resolve_token", "resolve_token" in _src_client)
+
+# 配置示例必须是纯占位符
+_cfg_path = os.path.join(_repo_root, "mcp-config.example.json")
+if os.path.exists(_cfg_path):
+    with open(_cfg_path, encoding="utf-8") as fh:
+        cfg_text = fh.read()
+    check("配置示例用环境变量占位符", "${MCD_MCP_TOKEN}" in cfg_text)
+    check("配置示例不含真实 Token",
+          not re.search(r"Bearer\s+(?!\$\{)[A-Za-z0-9_\-\.]{16,}", cfg_text))
+else:
+    check("配置文件存在", False, _cfg_path)
+
+# 个人信息扫描：仓库不得包含开发者真实身份信息
+# 排除官方原文存档（docs/mcp-rules-*.html 是麦当劳规则页快照，
+# 里面的客服邮箱属于官方信息，不是开发者隐私）
+_SKIP_SCAN = {"mcp-rules-20251203.html"}
+_PII_PATTERNS = [
+    ("真实手机号", re.compile(r"\b1[3-9]\d{9}\b")),
+    ("身份证号", re.compile(r"\b\d{17}[\dXx]\b")),
+    ("邮箱", re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")),
+]
+_pii_hits = []
+for _dirpath, _dirnames, _filenames in os.walk(_repo_root):
+    if ".git" in _dirpath or "__pycache__" in _dirpath:
+        continue
+    for _fn in _filenames:
+        if _fn in _SKIP_SCAN:
+            continue  # 官方原文快照，不属于开发者隐私
+        _p = os.path.join(_dirpath, _fn)
+        try:
+            with open(_p, encoding="utf-8", errors="ignore") as fh:
+                _txt = fh.read()
+        except OSError:
+            continue
+        for _label, _rx in _PII_PATTERNS:
+            for _m in _rx.finditer(_txt):
+                _val = _m.group(0)
+                # 允许明显是示例的值
+                if any(_v in _val for _v in ("00000", "12345", "example")):
+                    continue
+                _pii_hits.append(f"{os.path.relpath(_p, _repo_root)}:{_label}")
+check("仓库内无个人隐私信息（手机号/身份证/邮箱）", not _pii_hits, "; ".join(_pii_hits[:3]))
+check("官方规则快照已排除在隐私扫描外（客服邮箱属官方信息）",
+      _SKIP_SCAN and os.path.exists(os.path.join(_repo_root, "docs", "mcp-rules-20251203.html")))
 
 
 # ---------------------------------------------------------------- 输出

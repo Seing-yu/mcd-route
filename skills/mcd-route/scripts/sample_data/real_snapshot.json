@@ -5,10 +5,10 @@
   "_real_contract": {
     "_comment": "以下是真实接口返回结构的关键字段，README/MCP_INTEGRATION 的字段映射以此为准",
     "query_nearby_stores": {
-      "params": { "beType": 1, "searchType": 2, "city": "北京", "keyword": "望京" },
+      "params": { "beType": 1, "searchType": 2, "city": "北京", "keyword": "示例位置" },
       "response_data_item": {
         "storeCode": "1950980",
-        "storeName": "麦当劳北京望京街餐厅",
+        "storeName": "麦当劳（示例门店 A）",
         "address": "（已脱敏）",
         "distance": 312,
         "latitude": 39.98,
@@ -26,7 +26,7 @@
       "response_data_item": {
         "storeCode": "1980260",
         "beCode": "198026002",
-        "storeName": "麦当劳北京望京街餐厅",
+        "storeName": "麦当劳（示例门店 B）",
         "businessStartTime": "07:00",
         "businessEndTime": "22:00",
         "businessStatus": "营业中",
@@ -124,7 +124,7 @@
   "_coupon_pool_note": "真实情况下【两个渠道的券池是同一批】——query-my-coupons 返回的券标签写着「到店专用、外送专用」，query-store-coupons 也返回同样这两张。券池相同但【绑定门店不同】：到店券绑附近门店，外送券绑可配送门店。",
   "delivery": {
     "stores": [
-      { "storeCode": "1980260", "beCode": "198026002", "storeName": "麦当劳北京望京街餐厅" }
+      { "storeCode": "1980260", "beCode": "198026002", "storeName": "麦当劳（示例门店 B）" }
     ],
     "fee": 6.0,
     "packing_fee": 2.8,
@@ -154,7 +154,7 @@
   },
   "pickup": {
     "stores": [
-      { "storeCode": "1950980", "storeName": "麦当劳北京望京街餐厅", "distance": 312 }
+      { "storeCode": "1950980", "storeName": "麦当劳（示例门店 A）", "distance": 312 }
     ],
     "prep_minutes": 8,
     "travel_minutes": 20,

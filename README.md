@@ -5,7 +5,7 @@
 >
 > 麦当劳程序员创意开发大赛参赛作品 · 非麦当劳官方产品。
 
-![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![自测](https://img.shields.io/badge/selftest-111%20passed-success) ![License](https://img.shields.io/badge/license-MIT-green)
+![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![自测](https://img.shields.io/badge/selftest-119%20passed-success) ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
@@ -201,7 +201,7 @@ python decider.py --pretty
 python decider.py --minute-cost 0
 python decider.py --minute-cost 1.67
 
-# 跑 111 项自测（改逻辑后必跑）
+# 跑 119 项自测（改逻辑后必跑）
 python selftest.py
 
 # 前后端对拍：验证在线试算页与 CLI 结果一致（需 Node）
@@ -237,7 +237,7 @@ python real_run.py --city 北京 --keyword 望京
 |---|---|---|
 | MCP 客户端握手 | ✅ **真实实测** | 协议 2025-06-18，服务器 `mcd-mcp` v1.0.0，35 个 Tool |
 | 端到端链路走查 | ✅ **真实实测** | `real_run.py` 12 次真实调用跑通，**全程只读** |
-| 渠道计价与对比 | ✅ 真实 | `decider.py` 纯标准库实现，111 项自测覆盖各决策分支 |
+| 渠道计价与对比 | ✅ 真实 | `decider.py` 纯标准库实现，119 项自测覆盖各决策分支 |
 | 页面与 CLI 一致 | ✅ 真实 | `parity_check.py` 逐场景对拍两端（56 项比对），防止两份实现漂移 |
 | 真实数据回归 | ✅ **真实实测** | 24 项断言锁定真实接口契约，见 `sample_data/real_snapshot.json` |
 | 「到店省 7.30 元」结论 | ✅ **真实算出** | 真实数据跑出的结果：到店 ¥11.90 / 外送 ¥20.70 |
@@ -247,6 +247,62 @@ python real_run.py --city 北京 --keyword 望京
 | 券池内容 | 🟡 随账号变动 | 券是账号资产，随活动变化；结构真实，内容会变 |
 | 到店往返时间 | 🟡 经验值 | 往返 20 分钟为经验值；**距离本身是接口真实返回的**，可据此推算 |
 | 下单能力 | ✅ 真实 | 经 MCP 核价 → 下单（`create-order`），**本仓库脚本不下单** |
+
+---
+
+## 🔐 任何人都能用你自己的 Token 跑
+
+**这个问题评审一定会问，所以做成了可验证的事实。**
+
+开发者联调时用的是自己的 MCP Token，但那**只存在于开发者的机器上**：
+
+```
+C:\Users\<你>\.workbuddy\.mcd_token      ← 你的机器，不在仓库里
+```
+
+仓库里**没有任何真实凭据**。脚本按优先级读取：
+
+| 优先级 | 来源 | 适用场景 |
+|---|---|---|
+| 1 | 显式传参 `McpClient(token=...)` | 一次性调试 |
+| 2 | 环境变量 `MCD_MCP_TOKEN` | CI、临时使用 |
+| 3 | 本地凭据文件 `~/.workbuddy/.mcd_token` | 本机日常使用 |
+
+**你 clone 之后，只需配自己的 Token：**
+
+```bash
+git clone https://github.com/Seing-yu/mcd-route.git
+cd mcd-route/skills/mcd-route/scripts
+
+# 到 https://open.mcd.cn/mcp 手机号登录 → 控制台 → 激活，拿到你自己的 Token
+python setup_token.py          # 交互式输入，不回显，写入 ~/.workbuddy/.mcd_token
+
+python real_run.py              # 用【你自己的】账号跑真实链路
+```
+
+### 这件事是被验证过的，不是承诺
+
+| 验证项 | 结果 |
+|---|---|
+| 全仓库扫描真实 Token | ✅ 0 处命中 |
+| git 全部历史扫描 | ✅ 0 处命中 |
+| 配置示例内容 | ✅ 仅 `Bearer ${MCD_MCP_TOKEN}` |
+| 无 Token 时运行 | ✅ 返回空并提示申请，**不报错、不回退** |
+| 换 Token 后运行 | ✅ 请求头换成你自己的 |
+| 个人信息扫描 | ✅ 无手机号 / 身份证 / 邮箱（官方规则快照除外） |
+| **固化为自测断言** | ✅ **8 项，随 CI 自动检查** |
+
+> 也就是说：**「不含开发者凭据」这件事由 CI 守着**，将来任何人误提交真 Token，CI 会立刻失败。
+
+### 隐私处理
+
+| 数据 | 处理 |
+|---|---|
+| Token | 只在你的机器上，仓库内仅占位符 |
+| 配送地址、电话 | 真实快照中已替换为「示例门店 A/B」 |
+| 门店位置 | 真实快照已中性化；**但 `real_run.py` 与 `SKILL.md` 保留「望京」作为接口调用示例**——麦当劳北京望京店是公开门店，任何人都能照着跑通 |
+
+> 保留示例位置是有意的：它是**可复现的调用示例**，不是隐私。
 
 ---
 
@@ -339,7 +395,7 @@ python real_run.py --city 北京 --keyword 望京
     ├── scripts/
     │   ├── mcp_client.py          # 纯标准库 MCP 客户端（握手/工具列表/调用/合规护栏）
     │   ├── decider.py             # 决策引擎：渠道计价、对比、券体检、单位归一化
-│   ├── selftest.py            # 111 项自测
+│   ├── selftest.py            # 119 项自测
 │   ├── parity_check.py        # 前后端对拍（页面 vs CLI）
 │   ├── parity_check.mjs       # 前端计算引擎抽取器
 │   ├── setup_token.py         # 交互式配置 Token（不回显，不进对话）
@@ -360,7 +416,7 @@ python real_run.py --city 北京 --keyword 望京
 - **券的场景建模** —— 建模 `channel` 字段，解决「券用不了」这个真实痛点。
 - **保守计价** —— 不叠加券、不猜价格，宁可少报优惠也不给假低价。
 - **诚实降级** —— 起送价未达标、距离不可得、字段缺失，都有明确的降级说明。
-- **111 项自测** —— 覆盖券可用性、选券策略、计价、决策分支、字段归一化、金额单位契约、合规护栏七类。
+- **119 项自测** —— 覆盖券可用性、选券策略、计价、决策分支、字段归一化、金额单位契约、合规护栏七类。
 - **前后端对拍** —— 在线试算页与 CLI 是同一套逻辑，逐场景比对 56 项，防止漂移。
 
 ---

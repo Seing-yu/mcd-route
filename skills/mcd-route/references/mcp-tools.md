@@ -223,8 +223,8 @@ price:                 12480
 
 ```json
 {
-  "storeCode": "1950980",
-  "storeName": "麦当劳北京望京街餐厅",
+  "storeCode": "<门店编码>",
+  "storeName": "麦当劳（示例门店 A）",
   "distance": 312,          ← 米
   "latitude": 39.98, "longitude": 116.47,
   "businessStatus": "营业中",

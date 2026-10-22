@@ -5,7 +5,7 @@
   ],
   "delivery": {
     "stores": [
-      { "storeCode": "S001", "storeName": "麦当劳（望京SOHO店）", "distance": "medium" }
+      { "storeCode": "S001", "storeName": "麦当劳（示例门店 A）", "distance": "medium" }
     ],
     "fee": 9.0,
     "min_order": 20.0,
@@ -17,7 +17,7 @@
   },
   "pickup": {
     "stores": [
-      { "storeCode": "S002", "storeName": "麦当劳（阜通门店）", "distance": "close" }
+      { "storeCode": "S002", "storeName": "麦当劳（示例门店 B）", "distance": "close" }
     ],
     "prep_minutes": 8,
     "travel_minutes": 20,
