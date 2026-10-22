@@ -97,13 +97,25 @@ set MCD_MCP_TOKEN=你的token      # Windows
 **在 WorkBuddy 里使用**：左侧边栏【专家·技能·连接器】→【连接器】→
 右上角【自定义连接器】→【配置 MCP】，填入
 [`mcp-config.example.json`](mcp-config.example.json) 的内容，
-把 `${MCD_MCP_TOKEN}` 替换为你的真实 Token（或用环境变量注入），保存后【启用】。
+把 `${MCD_MCP_TOKEN}` 替换为你的真实 Token，保存 → 点【信任】→ 开启开关。
 
+> ⚠️ **WorkBuddy 桌面端不会展开 `${MCD_MCP_TOKEN}` 这类环境变量占位符。**
+> 它只会把字符串原样塞进请求头（实测：占位符会变成
+> `Bearer ${MCD_MCP_TOKEN}` 发给服务器，必然 401）。
+> 所以桌面端配置里必须写**真实 Token 字面值**。
+> 环境变量占位符只对**本 Skill 自带的脚本**有效
+> （`mcp_client.py` 自己解析 `MCD_MCP_TOKEN` 与 `~/.workbuddy/.mcd_token`），
+> 仓库里的 `mcp-config.example.json` 保留占位符是为了**不泄露真实 Token**，
+> 供他人复制时替换用。
+>
 > **为什么推荐用凭据文件而不是把 Token 贴进对话**：
 > MCP Token 与你的麦当劳会员账号强绑定，等同于账号操作权限。
 > 对话内容会经过第三方模型服务商处理，凭据文件则完全在你的机器上。
 > `scripts/selftest.py` 里有一项断言会**扫描整个仓库**，
 > 确认不存在任何真实 Token 形态的字符串。
+>
+> 桌面端 `~/.workbuddy/mcp.json` 里的 Token 是**明文**存放的
+> （该文件不在任何 git 仓库内，但请勿截图或分享该文件）。
 
 ### 3. 安装本 Skill
 
