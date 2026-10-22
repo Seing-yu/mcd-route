@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 
@@ -286,6 +287,99 @@ check("客户端不内嵌真实 Token", client.token == "dummy")
 check("默认 URL 正确", client.url == "https://mcp.mcd.cn", client.url)
 
 
+# ---------------------------------------------------------------- 真实数据回归
+# 以下断言全部基于 2026-10-22 真实 MCP 调用的返回（见 sample_data/real_snapshot.json）。
+# 目的：把「真实接口契约」锁死，防止后续改动破坏与真实数据的一致性。
+
+_real = None
+_real_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          "sample_data", "real_snapshot.json")
+if os.path.exists(_real_path):
+    with open(_real_path, encoding="utf-8") as fh:
+        _real = json.load(fh)
+
+if _real:
+    # --- 1. 真实核价返回：价格字段单位是「分」---
+    cp_del = _real["_real_contract"]["calculate_price_delivery"]["response_data"]
+    parsed = parse_calculate_price(cp_del)
+    check("真实外送:商品金额分转元", approx(parsed["goods"], 116.0), str(parsed["goods"]))
+    check("真实外送:配送费分转元", approx(parsed["delivery_fee"], 6.0), str(parsed["delivery_fee"]))
+    check("真实外送:打包费分转元", approx(parsed["packing_fee"], 2.8), str(parsed["packing_fee"]))
+    check("真实外送:合计分转元", approx(parsed["total"], 124.8), str(parsed["total"]))
+    check("真实外送:打包费非零（早期版本漏了这项）", parsed["packing_fee"] > 0)
+
+    cp_pick = _real["_real_contract"]["calculate_price_pickup"]["response_data"]
+    parsed2 = parse_calculate_price(cp_pick)
+    check("真实到店:商品金额分转元", approx(parsed2["goods"], 33.5), str(parsed2["goods"]))
+    check("真实到店:无配送费", approx(parsed2["delivery_fee"], 0.0))
+    check("真实到店:无打包费", approx(parsed2["packing_fee"], 0.0))
+
+    # --- 2. 真实门店券结构：商品券，不是满减券 ---
+    store_coupon = _real["_real_contract"]["query_store_coupons"]["response"][0]
+    cs = collect_channel_coupons([store_coupon], "pickup", "query-store-coupons")
+    check("真实券:解析出1张", len(cs) == 1, str(len(cs)))
+    check("真实券:绑定商品编码", cs[0].product_codes == ["9900016534"], str(cs[0].product_codes))
+    check("真实券:从券名解析出用券价", approx(cs[0].use_price, 19.9), str(cs[0].use_price))
+    check("真实券:有效期区间解析", cs[0].valid_from.startswith("2026-10-19"), cs[0].valid_from)
+    check("真实券:couponCode 保留", cs[0].coupon_code.startswith("MCD"), cs[0].coupon_code)
+
+    # --- 3. 真实「多标签」渠道判定（到店专用、外送专用 → 两边都能用）---
+    multi = collect_channel_coupons(
+        [{"title": "11.9元麦辣鸡腿堡", "标签": "到店专用、外送专用",
+          "products": [{"productCode": "1440"}]}], "pickup", "query-my-coupons")
+    check("真实标签:多标签判为通用", multi[0].channel == "any", multi[0].channel)
+    ok_p, _ = multi[0].usable_for("pickup", 22.5)
+    ok_d, _ = multi[0].usable_for("delivery", 22.5)
+    check("真实标签:到店可用", ok_p)
+    check("真实标签:外送可用", ok_d)
+
+    # 仅到店
+    only_p = collect_channel_coupons(
+        [{"title": "X", "标签": "到店专用"}], "pickup", "query-my-coupons")
+    check("真实标签:仅到店判为 pickup", only_p[0].channel == "pickup", only_p[0].channel)
+    ok2, why2 = only_p[0].usable_for("delivery", 22.5)
+    check("真实标签:仅到店券在外送被拒", not ok2 and "到店" in why2)
+
+    # --- 4. 商品券必须命中购物篮商品 ---
+    basket_match = [BasketItem("1440", "麦辣鸡腿汉堡", 22.5, 1)]
+    basket_nomatch = [BasketItem("9900005456", "麦辣鸡腿汉堡三件套", 33.5, 1)]
+    amt_m, name_m, _ = best_coupon(multi, "pickup", 22.5, basket_match)
+    check("券绑定商品在篮内→可抵扣", approx(amt_m, 10.6), f"{amt_m} {name_m}")
+    amt_n, name_n, _ = best_coupon(multi, "pickup", 33.5, basket_nomatch)
+    check("券绑定商品不在篮内→不抵扣", approx(amt_n, 0.0), f"{amt_n} {name_n}")
+    check("无匹配时提示无可用券", name_n == "无可用券", name_n)
+
+    # --- 5. 真实端到端决策 ---
+    _basket = build_basket(_real["basket"])
+    _dv = Channel("delivery", "外送", stores=[{"s": 1}],
+                  coupons=collect_channel_coupons(_real["delivery"]["coupons"], "delivery", "query-store-coupons"),
+                  delivery_fee=_real["delivery"]["fee"], packing_fee=_real["delivery"]["packing_fee"],
+                  min_order=_real["delivery"]["min_order"], prep_minutes=_real["delivery"]["prep_minutes"])
+    _pk = Channel("pickup", "到店自取", stores=[{"s": 1}],
+                  coupons=collect_channel_coupons(_real["pickup"]["coupons"], "pickup", "query-store-coupons"),
+                  prep_minutes=_real["pickup"]["prep_minutes"], travel_minutes=_real["pickup"]["travel_minutes"])
+    _v = compare(_dv, _pk, _basket, minute_cost=0.5)
+    check("真实场景:推荐到店", _v.recommended == "到店自取", _v.recommended)
+    check("真实场景:到店到手价=券价11.9",
+          approx(_v.detail["pickup"]["total"], 11.9), str(_v.detail["pickup"]["total"]))
+    check("真实场景:外送到手价=11.9+6+2.8=20.7",
+          approx(_v.detail["delivery"]["total"], 20.7), str(_v.detail["delivery"]["total"]))
+    check("真实场景:两渠道券都生效",
+          approx(_v.detail["pickup"]["discount"], 10.6) and approx(_v.detail["delivery"]["discount"], 10.6))
+
+    # --- 6. 券体检：标出商品不匹配 ---
+    _rows = coupon_audit(collect_channel_coupons(_real["delivery"]["coupons"], "delivery", "x"),
+                          33.5, basket_nomatch)
+    _names = {r["name"]: r for r in _rows}
+    _mcd = _names.get("11.9元麦辣鸡腿堡")
+    check("券体检:标出商品不匹配", _mcd is not None and not _mcd["product_match"],
+          str(_mcd["product_note"]) if _mcd else "无此券")
+    check("券体检:不匹配时实际抵扣为0", _mcd is not None and approx(_mcd["actual_discount"], 0.0))
+
+else:
+    check("真实快照文件存在", False, f"未找到 {_real_path}")
+
+
 # ---------------------------------------------------------------- Token 解析
 # Token 等同于会员账号操作权限。必须保证：
 #   · 优先级正确（显式 > 环境变量 > 凭据文件）
@@ -297,24 +391,30 @@ import tempfile  # noqa: E402
 
 check("显式参数优先", resolve_token("explicit") == "explicit")
 
-_saved_env = os.environ.pop("MCD_MCP_TOKEN", None)
-check("无任何配置时返回空串", resolve_token() == "", repr(resolve_token()))
-check("未配置时来源标识正确", token_source() == "未配置", token_source())
-
-os.environ["MCD_MCP_TOKEN"] = "env-token"
-check("环境变量被识别", resolve_token() == "env-token")
-check("环境变量来源标识", "MCD_MCP_TOKEN" in token_source(), token_source())
-check("显式参数仍优先于环境变量", resolve_token("explicit") == "explicit")
-
-if _saved_env is not None:
-    os.environ["MCD_MCP_TOKEN"] = _saved_env
-else:
-    os.environ.pop("MCD_MCP_TOKEN", None)
-
-# 凭据文件解析（用临时文件，不碰真实凭据）
+# ⚠️ 这几条必须在【未配置任何凭据】的前提下断言。
+# 用例运行前先把环境变量摘掉，并把凭据文件路径临时指向一个不存在的文件，
+# 避免受开发机上真实配置的影响（真实凭据存在时 resolve_token 会正常返回它）。
 import mcp_client  # noqa: E402
 
 _real_token_file = mcp_client.TOKEN_FILE
+_saved_env = os.environ.pop("MCD_MCP_TOKEN", None)
+_missing_file = os.path.join(os.path.dirname(_real_token_file), ".mcd_token_nonexistent_test")
+try:
+    mcp_client.TOKEN_FILE = _missing_file
+    check("无任何配置时返回空串", resolve_token() == "", repr(resolve_token()))
+    check("未配置时来源标识正确", token_source() == "未配置", token_source())
+
+    os.environ["MCD_MCP_TOKEN"] = "env-token"
+    check("环境变量被识别", resolve_token() == "env-token")
+    check("环境变量来源标识", "MCD_MCP_TOKEN" in token_source(), token_source())
+    check("显式参数仍优先于环境变量", resolve_token("explicit") == "explicit")
+    os.environ.pop("MCD_MCP_TOKEN", None)
+finally:
+    mcp_client.TOKEN_FILE = _real_token_file
+    if _saved_env is not None:
+        os.environ["MCD_MCP_TOKEN"] = _saved_env
+
+# 凭据文件解析（用临时文件，不碰真实凭据）
 with tempfile.NamedTemporaryFile("w", suffix=".token", delete=False, encoding="utf-8") as fh:
     fh.write("file-token\nsecond-line-ignored\n")
     _tmp_path = fh.name
@@ -323,7 +423,7 @@ try:
     check("凭据文件被识别", resolve_token() == "file-token", repr(resolve_token()))
     check("只读首行", resolve_token() != "file-token\nsecond-line-ignored")
     check("来源标识不泄露 token", "file-token" not in token_source(), token_source())
-    check("来源标识指向文件", ".mcd_token" in token_source() or "token" in token_source().lower())
+    check("来源标识指向文件", "token" in token_source().lower())
 finally:
     mcp_client.TOKEN_FILE = _real_token_file
     os.unlink(_tmp_path)

@@ -1,0 +1,183 @@
+{
+  "_note": "2026-10-22 真实 MCP 调用快照。结构与字段名逐字对标真实返回，取值为真实值。个人隐私字段（地址详情、电话）已脱敏。",
+  "_source": "mcd.mcd.cn · McDonald's China MCP Server v1.0.0 · 协议 2025-06-18",
+
+  "_real_contract": {
+    "_comment": "以下是真实接口返回结构的关键字段，README/MCP_INTEGRATION 的字段映射以此为准",
+    "query_nearby_stores": {
+      "params": { "beType": 1, "searchType": 2, "city": "北京", "keyword": "望京" },
+      "response_data_item": {
+        "storeCode": "1950980",
+        "storeName": "麦当劳北京望京街餐厅",
+        "address": "（已脱敏）",
+        "distance": 312,
+        "latitude": 39.98,
+        "longitude": 116.47,
+        "reservation": true,
+        "businessStartTime": "06:30",
+        "businessEndTime": "22:30",
+        "businessStatus": "营业中",
+        "reservationTimeOptions": []
+      },
+      "_key_finding": "接口【确实返回 distance 距离字段（米）】，还带经纬度。早期文档假设「不返回距离」是错的。"
+    },
+    "delivery_query_stores": {
+      "params": { "addressId": "<已脱敏>", "beType": 2 },
+      "response_data_item": {
+        "storeCode": "1980260",
+        "beCode": "198026002",
+        "storeName": "麦当劳北京望京街餐厅",
+        "businessStartTime": "07:00",
+        "businessEndTime": "22:00",
+        "businessStatus": "营业中",
+        "reservation": true
+      },
+      "_key_finding": "外送门店【多一个 beCode 字段】，算价时必传，否则报 600048「外送场景下，beType=2/5/6时必传beCode」。"
+    },
+    "query_meals": {
+      "params": { "storeCode": "1950980", "beType": 1, "orderType": 1 },
+      "response_data": { "categories": [ { "name": "人气热卖", "meals": [] } ], "meals": { "<productCode>": {} } },
+      "response_meal_item": {
+        "name": "麦辣鸡腿汉堡三件套",
+        "currentPrice": "33.5",
+        "originalPrice": "47",
+        "canWithOrder": false,
+        "image": "https://menu-img.mcd.cn/..."
+      },
+      "_key_finding": "menu 共 118 款（到店）/ 115 款（外送）。价格字段是【元字符串】，不是分。meals 是 dict（key=productCode），不是数组。"
+    },
+    "calculate_price_pickup": {
+      "params": { "storeCode": "1950980", "beType": 1, "orderType": 1, "items": [ { "productCode": "9900005456", "quantity": 1 } ] },
+      "response_data": {
+        "productOriginalPrice": 3350,
+        "productPrice": 3350,
+        "originalPrice": 3350,
+        "discount": 0,
+        "price": 3350,
+        "productList": [ { "productCode": "9900005456", "productName": "麦辣鸡腿汉堡三件套", "quantity": 1, "originalSubtotal": 3350, "subtotal": 3350 } ],
+        "takeWayList": [ { "code": "eat-in", "title": "堂食", "subtitle": "店内用餐" }, { "code": "take-in-store", "title": "外带", "subtitle": "店内自提" } ]
+      },
+      "_key_finding": "菜单现价 33.5 元 → 核价 3350。确认 calculate-price 的价格字段单位是【分】。takeWayList 给出可选就餐方式（堂食/外带）。"
+    },
+    "calculate_price_delivery": {
+      "params": { "storeCode": "1980260", "beCode": "198026002", "beType": 2, "orderType": 2, "items": [ { "productCode": "9900012945", "quantity": 1 } ] },
+      "response_data": {
+        "productOriginalPrice": 11600,
+        "productPrice": 11600,
+        "deliveryOriginalPrice": 600,
+        "deliveryPrice": 600,
+        "packingOriginalPrice": 280,
+        "packingPrice": 280,
+        "originalPrice": 12480,
+        "discount": 0,
+        "price": 12480
+      },
+      "_key_finding": "外送真实返回里有【打包费 packingPrice=280 → ¥2.80】，是独立费用项。早期版本漏了它，会让外送总价少算 2~3 元。"
+    },
+    "query_store_coupons": {
+      "params": { "storeCode": "1950980", "beType": 1, "orderType": 1 },
+      "response": [
+        {
+          "title": "19.9元王牌炸鸡任选2",
+          "couponId": "44928824D2D4273FE5ECA617BBF75483",
+          "couponCode": "MCD671731107Q90Z10206",
+          "tradeDateTime": "2026-10-19 10:30:00-2026-10-23 23:59:59",
+          "products": [ { "productCode": "9900016534", "productName": "王牌炸鸡任选2" } ],
+          "promotionId": "112479004"
+        },
+        {
+          "title": "11.9元麦辣鸡腿堡",
+          "couponId": "A255280326E3328D179C362B7B8DDA65",
+          "couponCode": "MCD601Q0610849Z410760",
+          "tradeDateTime": "2026-10-19 10:30:00-2026-10-23 23:59:59",
+          "products": [ { "productCode": "1440", "productName": "麦辣鸡腿汉堡" } ],
+          "promotionId": "112479003"
+        }
+      ],
+      "_key_finding": "门店券是【商品券】：绑定 products[].productCode，不是全场满减。券名里的「11.9元」是用券价。tradeDateTime 是有效期区间，不是消费门槛。JSON 里【没有渠道字段】。"
+    },
+    "query_my_coupons": {
+      "params": {},
+      "response_format": "Markdown",
+      "response_sample": "## 11.9元麦辣鸡腿堡\n- **优惠**: ¥11.9 (用券价格)\n- **有效期**: 2026-10-19 10:30-2026-10-23 23:59 周一、二、三、四、五 10:30-23:59\n- **领取时间**: 5日前收到\n- **标签**: 到店专用、外送专用",
+      "_key_finding": "卡包券是【Markdown】格式，且【有「标签」字段】标明渠道（到店专用/外送专用）。两个券接口格式完全不同，必须分别解析。"
+    },
+    "available_coupons": {
+      "params": {},
+      "response_format": "Markdown",
+      "response_sample": "### 麦麦省优惠券列表：\n- 优惠券标题：11.9元麦辣鸡腿堡 \\\n  状态：已领取 \\\n- 优惠券标题：免费脆薯饼 \\\n  状态：可领取",
+      "_key_finding": "麦麦省可领券也是 Markdown，且带「状态」字段（可领取/已领取）。可领券不先 auto-bind-coupons 领取，就不会出现在 query-my-coupons 里。"
+    },
+    "error_codes_observed": {
+      "400": "缺少参数 —— query-nearby-stores 不接受 address 参数，必须传 beType + searchType + city + keyword",
+      "600048": "外送场景下，beType=2/5/6时必传beCode",
+      "success_false": "业务失败藏在 data.success=false + code/message 里，不是 HTTP 错误码"
+    }
+  },
+
+  "basket": [
+    { "code": "1440", "name": "麦辣鸡腿汉堡", "price": 22.5, "qty": 1, "_note": "券绑定的商品，券可用" }
+  ],
+  "_basket_alt": [
+    { "code": "9900005456", "name": "麦辣鸡腿汉堡三件套", "price": 33.5, "qty": 1, "_note": "换成套餐，券就绑不上了" }
+  ],
+  "_coupon_pool_note": "真实情况下【两个渠道的券池是同一批】——query-my-coupons 返回的券标签写着「到店专用、外送专用」，query-store-coupons 也返回同样这两张。券池相同但【绑定门店不同】：到店券绑附近门店，外送券绑可配送门店。",
+  "delivery": {
+    "stores": [
+      { "storeCode": "1980260", "beCode": "198026002", "storeName": "麦当劳北京望京街餐厅" }
+    ],
+    "fee": 6.0,
+    "packing_fee": 2.8,
+    "min_order": 20.0,
+    "prep_minutes": 25,
+    "coupons": [
+      {
+        "title": "11.9元麦辣鸡腿堡",
+        "couponId": "A255280326E3328D179C362B7B8DDA65",
+        "couponCode": "MCD601Q0610849Z410760",
+        "tradeDateTime": "2026-10-19 10:30:00-2026-10-23 23:59:59",
+        "products": [ { "productCode": "1440", "productName": "麦辣鸡腿汉堡" } ],
+        "promotionId": "112479003",
+        "标签": "到店专用、外送专用"
+      },
+      {
+        "title": "19.9元王牌炸鸡任选2",
+        "couponId": "44928824D2D4273FE5ECA617BBF75483",
+        "couponCode": "MCD671731107Q90Z10206",
+        "tradeDateTime": "2026-10-19 10:30:00-2026-10-23 23:59:59",
+        "products": [ { "productCode": "9900016534", "productName": "王牌炸鸡任选2" } ],
+        "promotionId": "112479004",
+        "标签": "到店专用、外送专用"
+      }
+    ],
+    "notes": []
+  },
+  "pickup": {
+    "stores": [
+      { "storeCode": "1950980", "storeName": "麦当劳北京望京街餐厅", "distance": 312 }
+    ],
+    "prep_minutes": 8,
+    "travel_minutes": 20,
+    "coupons": [
+      {
+        "title": "11.9元麦辣鸡腿堡",
+        "couponId": "A255280326E3328D179C362B7B8DDA65",
+        "couponCode": "MCD601Q0610849Z410760",
+        "tradeDateTime": "2026-10-19 10:30:00-2026-10-23 23:59:59",
+        "products": [ { "productCode": "1440", "productName": "麦辣鸡腿汉堡" } ],
+        "promotionId": "112479003",
+        "标签": "到店专用、外送专用"
+      },
+      {
+        "title": "19.9元王牌炸鸡任选2",
+        "couponId": "44928824D2D4273FE5ECA617BBF75483",
+        "couponCode": "MCD671731107Q90Z10206",
+        "tradeDateTime": "2026-10-19 10:30:00-2026-10-23 23:59:59",
+        "products": [ { "productCode": "9900016534", "productName": "王牌炸鸡任选2" } ],
+        "promotionId": "112479004",
+        "标签": "到店专用、外送专用"
+      }
+    ],
+    "notes": []
+  }
+}

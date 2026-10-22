@@ -5,7 +5,7 @@
 >
 > 麦当劳程序员创意开发大赛参赛作品 · 非麦当劳官方产品。
 
-![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![自测](https://img.shields.io/badge/selftest-84%20passed-success) ![License](https://img.shields.io/badge/license-MIT-green)
+![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![自测](https://img.shields.io/badge/selftest-111%20passed-success) ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
@@ -18,19 +18,24 @@
 | | 外送 | 到店自取 |
 |---|---|---|
 | 配送费 | 有，随距离与时段浮动 | 无 |
+| **打包费** | **有**（实测 ¥2.80） | 无 |
 | 起送价 | **硬门槛**，未达标直接不可下单 | 无 |
-| 券可用性 | 部分门店券**用不了** | 部分券**仅到店可用** |
+| 券可用性 | 券绑**商品**，还可能**仅到店可用** | 同左 |
 | 券绑定 | 绑「能送到你家」的门店 | 绑「离你最近」的门店 |
 | 时间成本 | 等餐 | 往返路程 + 出餐 |
 
-关键在于：**能送外卖的店，和离你最近的店，常常不是同一家。**
-所以「到店更便宜」不等于「去那家店更便宜」——券是绑门店的。
+关键在于两点：
+
+1. **能送外卖的店，和离你最近的店，常常不是同一家。** 所以「到店更便宜」不等于「去那家店更便宜」——券是绑门店的。
+2. **券是商品券，不是满减券。** 券名里的「11.9元」是用券价，
+   抵扣额要拿菜单原价减出来。而且**券只对绑定的那款商品生效**——
+   你买套餐，这张单品券就用不上。
 
 **核心洞察：取数交给 MCP，算术交给代码，表达交给 Agent。**
 
 | 角色 | 职责 |
 |---|---|
-| 麦当劳 MCP | 实时门店、菜单、券、价格、配送费、起送价 |
+| 麦当劳 MCP | 实时门店、菜单、券、价格、配送费、打包费、起送价 |
 | `scripts/decider.py` | 确定性渠道计价与对比，输出可执行建议 |
 | WorkBuddy Agent | 理解需求、编排调用、讲解方案、确认后下单 |
 
@@ -40,17 +45,14 @@
 
 **→ <https://Seing-yu.github.io/mcd-route/>**
 
-拖动配送费、起送价、等待时间、**每分钟时间成本**，实时看出哪个渠道更划算；
+拖动配送费、打包费、起送价、等待时间、**每分钟时间成本**，实时看出哪个渠道更划算；
 勾掉某张券，立刻看到结论怎么变。
 
 > 页面上的计算逻辑是 `decider.py` 的**同一套实现**，
 > `scripts/parity_check.py` 会逐场景对拍两端结果（56 项比对）防止漂移。
 >
 > 页面使用样例数据，不连接麦当劳接口、不读取你的任何账户信息。
-> 想用真实数据请在本地配置 Token 后运行 `mcp_probe.py`。
-
-**最容易踩的坑，页面里可以直接看到**：把「门店券 满40减15」勾上，
-外送场景下它**根本用不了**——这正是多数省钱助手会算错的地方。
+> 想用真实数据请在本地配置 Token 后运行 `real_run.py`。
 
 ---
 
@@ -199,7 +201,7 @@ python decider.py --pretty
 python decider.py --minute-cost 0
 python decider.py --minute-cost 1.67
 
-# 跑 84 项自测（改逻辑后必跑）
+# 跑 111 项自测（改逻辑后必跑）
 python selftest.py
 
 # 前后端对拍：验证在线试算页与 CLI 结果一致（需 Node）
@@ -208,7 +210,23 @@ python parity_check.py
 # 真实 MCP 连通自检（需 Token，证明数据链路是真的）
 python setup_token.py      # 交互式配置 Token（不回显）
 python mcp_probe.py
-python mcp_probe.py --call query-nearby-stores --args '{"address":"北京市朝阳区"}'
+
+# 端到端真实走查（12 次真实调用，全程只读，不下单不领券）
+python real_run.py
+python real_run.py --city 北京 --keyword 望京
+```
+
+**真实走查输出节选**（2026-10-22 实测）：
+
+```
+1) query-nearby-stores   → 5 家门店，含 distance=312m
+2) query-meals            → 到店在售 118 款
+3) query-store-coupons    → 2 张（JSON 格式）
+4) query-my-coupons       → 2 张（Markdown 格式）
+6) calculate-price 到店   → 商品 ¥22.5，无配送费无打包费
+7) 外送侧                  → 配送费 ¥6.0 打包费 ¥2.8
+8) 渠道决策                → 到店自取，净省 ¥7.30
+9) 券体检                  → 11.9元券抵扣 ¥10.6（命中）；19.9元券抵扣 0（未命中）
 ```
 
 ---
@@ -217,14 +235,18 @@ python mcp_probe.py --call query-nearby-stores --args '{"address":"北京市朝�
 
 | 项目 | 性质 | 说明 |
 |---|---|---|
-| MCP 客户端握手 | ✅ 真实 | `mcp_probe.py` 可现场验证 Token 握手 + 工具清单 + 试调用 |
-| 渠道计价与对比 | ✅ 真实 | `decider.py` 纯标准库实现，84 项自测覆盖各决策分支 |
-| 「省 13.5 元」结论 | ✅ 真实 | 算法在样例数据上算出，非人工编排 |
-| 券的渠道限制 | ✅ 真实 | 券的 `channel` 字段严格参与计算，跨渠道券被剔除 |
-| 配送费 / 起送价 | 🟡 示例快照 | 取自 `calculate-price` 的返回结构，数值用于演示，以实时返回为准 |
-| 门店券内容 | 🟡 示例快照 | 结构对齐 `query-store-coupons`，可用性以账号实时状态为准 |
-| 到店往返时间 | 🟡 分档估算 | **MCP 门店接口不返回距离**，按距离分档估算，已在 `SKILL.md` 诚实降级表中声明 |
-| 下单能力 | ✅ 真实 | 经 MCP 核价（`calculate-price`）→ 下单（`create-order`），本仓库页面不涉及下单 |
+| MCP 客户端握手 | ✅ **真实实测** | 协议 2025-06-18，服务器 `mcd-mcp` v1.0.0，35 个 Tool |
+| 端到端链路走查 | ✅ **真实实测** | `real_run.py` 12 次真实调用跑通，**全程只读** |
+| 渠道计价与对比 | ✅ 真实 | `decider.py` 纯标准库实现，111 项自测覆盖各决策分支 |
+| 页面与 CLI 一致 | ✅ 真实 | `parity_check.py` 逐场景对拍两端（56 项比对），防止两份实现漂移 |
+| 真实数据回归 | ✅ **真实实测** | 24 项断言锁定真实接口契约，见 `sample_data/real_snapshot.json` |
+| 「到店省 7.30 元」结论 | ✅ **真实算出** | 真实数据跑出的结果：到店 ¥11.90 / 外送 ¥20.70 |
+| 配送费与打包费 | ✅ **真实实测** | 外送核价返回 `deliveryPrice=600`、`packingPrice=280`（单位：分） |
+| 券的抵扣额 | ✅ **真实实测** | 麦辣鸡腿汉堡 ¥22.5，券价 ¥11.9 → 抵扣 ¥10.6 |
+| 门店距离 | ✅ **真实实测** | `query-nearby-stores` 返回 `distance=312`（米） |
+| 券池内容 | 🟡 随账号变动 | 券是账号资产，随活动变化；结构真实，内容会变 |
+| 到店往返时间 | 🟡 经验值 | 往返 20 分钟为经验值；**距离本身是接口真实返回的**，可据此推算 |
+| 下单能力 | ✅ 真实 | 经 MCP 核价 → 下单（`create-order`），**本仓库脚本不下单** |
 
 ---
 
@@ -317,7 +339,7 @@ python mcp_probe.py --call query-nearby-stores --args '{"address":"北京市朝�
     ├── scripts/
     │   ├── mcp_client.py          # 纯标准库 MCP 客户端（握手/工具列表/调用/合规护栏）
     │   ├── decider.py             # 决策引擎：渠道计价、对比、券体检、单位归一化
-│   ├── selftest.py            # 84 项自测
+│   ├── selftest.py            # 111 项自测
 │   ├── parity_check.py        # 前后端对拍（页面 vs CLI）
 │   ├── parity_check.mjs       # 前端计算引擎抽取器
 │   ├── setup_token.py         # 交互式配置 Token（不回显，不进对话）
@@ -338,7 +360,7 @@ python mcp_probe.py --call query-nearby-stores --args '{"address":"北京市朝�
 - **券的场景建模** —— 建模 `channel` 字段，解决「券用不了」这个真实痛点。
 - **保守计价** —— 不叠加券、不猜价格，宁可少报优惠也不给假低价。
 - **诚实降级** —— 起送价未达标、距离不可得、字段缺失，都有明确的降级说明。
-- **84 项自测** —— 覆盖券可用性、选券策略、计价、决策分支、字段归一化、金额单位契约、合规护栏七类。
+- **111 项自测** —— 覆盖券可用性、选券策略、计价、决策分支、字段归一化、金额单位契约、合规护栏七类。
 - **前后端对拍** —— 在线试算页与 CLI 是同一套逻辑，逐场景比对 56 项，防止漂移。
 
 ---

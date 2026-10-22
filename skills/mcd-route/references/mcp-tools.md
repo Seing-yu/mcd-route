@@ -127,43 +127,160 @@
 
 ## 七、实测记录
 
-### 7.1 金额单位契约（最容易踩的坑）
+> 以下全部为 **2026-10-22 使用真实 Token 实测**得到的结果，
+> 原始返回快照见 `scripts/sample_data/real_snapshot.json`。
+> 这批数据同时被 `selftest.py` 的 24 项「真实数据回归」断言锁定。
+
+### 7.1 真实调用能跑通什么
+
+| 环节 | 状态 | 说明 |
+|---|---|---|
+| `initialize` 握手 | ✅ | 协商出协议版本 **2025-06-18**（服务器 `mcd-mcp` v1.0.0） |
+| `tools/list` | ✅ | 服务器提供 **35 个 Tool**（官方 README 只列了 34 个，多出 `query-survey-coupon`） |
+| 本项目依赖的 11 个 Tool | ✅ | 全部在线 |
+| `query-nearby-stores` | ✅ | 返回 5 家门店，**含 distance 距离字段** |
+| `delivery-query-stores` | ✅ | 返回可配送门店，**多一个 beCode 字段** |
+| `query-meals` | ✅ | 到店 118 款 / 外送 115 款 |
+| `calculate-price` | ✅ | 到店与外送均能核价，**返回配送费与打包费** |
+| `query-my-coupons` | ✅ | 返回 Markdown 格式券列表 |
+| `query-store-coupons` | ✅ | 返回 JSON 格式券列表 |
+| `available-coupons` | ✅ | 返回 Markdown 格式可领券列表 |
+
+### 7.2 金额单位契约（最容易踩的坑）
 
 **麦当劳 MCP 的金额单位按工具区分，不能一概处理：**
 
-| Tool | 金额单位 | 处理方式 |
+| Tool | 金额单位 | 实测证据 |
 |---|---|---|
-| `calculate-price` | **分**（无引号整数） | **除以 100** |
-| `query-meals` | **元**（字符串，如 `"47.00"`） | 直接用 |
-| `query-meal-detail` | **元** | 直接用 |
-| `create-order` / `query-order` | **元** | 直接用 |
-| 麦麦商城订单 | **元** | 直接用 |
-| 积分字段（`points` / `totalPoints` 等） | 非金额 | **不做任何换算** |
+| `calculate-price` | **分**（无引号整数） | 菜单现价 `'33.5'` → 核价 `productOriginalPrice: 3350` |
+| `query-meals` | **元**（字符串） | `currentPrice: '33.5'` / `originalPrice: '47'` |
+| `query-meal-detail` | 元 | 同上 |
+| `create-order` / `query-order` | 元 | 官方 README 说明 |
+| 麦麦商城订单 | 元 | 官方 README 说明 |
+| 积分字段（`points` 等） | 非金额 | **不做任何换算** |
 
 **混用会导致每个金额差 100 倍。**
-本项目的处理：`decider.py` 内部统一用「元」，
-`parse_calculate_price()` 负责把 `calculate-price` 的分值转成元，
-`fen_to_yuan()` / `to_yuan()` 是底层换算函数。
-回归测试见 `selftest.py` 的「金额单位契约」一组断言。
+本项目内部统一用「元」，`parse_calculate_price()` 专责转换，
+`fen_to_yuan()` / `to_yuan()` 是底层函数。
 
-> 这个坑官方文档不会写，只能靠真实调用撞出来。
+### 7.3 外送的三个隐藏费用项
 
-### 7.2 其他实测观察
+实测外送核价返回：
 
-1. **券有场景属性**：实测部分门店券仅到店可用。外送场景必须剔除这些券，
-   否则会报出实际用不了的低价。
-2. **券要四路查全**：`available-coupons` 的券需先 `auto-bind-coupons` 领取，
-   不领就不在 `query-my-coupons` 中返回。
-3. **门店券绑门店**：换一家门店取到的券完全不同，因此两个渠道必须分别查券。
-4. **起送价是硬约束**：外送未达起送价即不可用，到店无此限制。
-5. **历史订单可能为空**：`order-list` 在无历史订单时返回空列表。
-6. **营养数据可直接用**：`list-nutrition-foods` 一次返回约 160 款餐品的多维营养数据。
-7. **响应不一定是纯 JSON**：部分 Tool 返回「散文说明 + 内嵌 JSON」的混合文本，
-   需先从文本中提取 JSON 再解析，不能直接 `json.loads`。
-8. **`query-nearby-stores` 参数联动**：`searchType=2` 时 `city` 与 `keyword`
-   必须成对提供，只给其一会报错。
-9. **券要作为独立 item 参与算价**：引用券需以独立商品项传入
-   `{productCode, quantity:1, couponId, couponCode}`，挂在普通餐品上无效。
+```
+productOriginalPrice: 11600        ← 商品 116.00 元
+deliveryOriginalPrice:  600        ← 配送费  6.00 元
+packingOriginalPrice:   280        ← 打包费  2.80 元   ← 独立费用项，别漏
+originalPrice:         12480        ← 合计 124.80 元
+price:                 12480
+```
 
-> 上述为多个独立参赛项目的实测结论汇总与本项目的设计依据。
-> 本项目自身的真实 Token 联调记录将在取得 Token 后于本节补充。
+⚠️ **打包费是独立字段**，早期版本遗漏了它，会让外送总价少算 2~3 元。
+
+### 7.4 券是「商品券」，不是满减券
+
+真实门店券返回：
+
+```json
+{
+  "title": "11.9元麦辣鸡腿堡",
+  "couponId": "A255280326E3328D179C362B7B8DDA65",
+  "couponCode": "MCD601Q0610849Z410760",
+  "tradeDateTime": "2026-10-19 10:30:00-2026-10-23 23:59:59",
+  "products": [{ "productCode": "1440", "productName": "麦辣鸡腿汉堡" }],
+  "promotionId": "112479003"
+}
+```
+
+**关键含义**（与最初假设完全不同，已按实测重写）：
+
+| 字段 | 实际含义 | 最初假设（错） |
+|---|---|---|
+| `title` 里的「11.9元」 | **用券价**（11.9 元买这个汉堡） | 当成抵扣额 |
+| `products[].productCode` | 券**绑定具体商品** | 以为是全场满减 |
+| `tradeDateTime` | **有效期区间** | 以为是消费门槛 |
+| 抵扣额 | 需用**菜单原价 − 用券价**反推 | 直接取 `discount` |
+
+**必须检查购物篮是否含该券绑定的商品**，否则会报出一张根本用不上的券。
+实测案例：卡包有「11.9元麦辣鸡腿堡」券（绑定 1440），
+但购物篮里是「麦辣鸡腿汉堡三件套」（9900005456）→ 券用不上，抵扣为 0。
+
+### 7.5 两个券接口格式不同
+
+| 接口 | 格式 | 渠道信息 |
+|---|---|---|
+| `query-store-coupons`（门店券） | **纯 JSON 数组** | JSON 里**没有**渠道字段 |
+| `query-my-coupons`（卡包券） | **Markdown** | 有「标签」字段 |
+| `available-coupons`（麦麦省） | **Markdown** | 有「状态」字段（可领取/已领取） |
+
+卡包券的标签实测值：`到店专用、外送专用` —— **多标签表示两个渠道都能用**。
+解析时必须**先判多标签**，否则会先匹配到「外送」而误判成仅外送可用。
+
+### 7.6 距离字段确实存在
+
+早期文档假设「门店接口不返回距离」——**这是错的**。
+`query-nearby-stores` 实测返回：
+
+```json
+{
+  "storeCode": "1950980",
+  "storeName": "麦当劳北京望京街餐厅",
+  "distance": 312,          ← 米
+  "latitude": 39.98, "longitude": 116.47,
+  "businessStatus": "营业中",
+  "reservation": true
+}
+```
+
+因此往返时间可以按真实距离推算，不必再用粗略分档估算。
+
+### 7.7 参数名与必填约束（实测踩坑）
+
+| 接口 | 必填参数 | 踩坑 |
+|---|---|---|
+| `query-nearby-stores` | `beType` + `searchType` | **不接受 `address`**（传了报 400「缺少参数」）；`searchType=2` 时 `city` 与 `keyword` 必须成对 |
+| `delivery-query-stores` | `addressId` + `beType` | `addressId` 来自 `delivery-query-addresses` |
+| `query-meals` | `storeCode` + `beType` + `orderType` | 外送时须带 `beCode` |
+| `calculate-price` | `storeCode` + `beType` + `orderType` | 外送时须带 `beCode`，否则报 **600048** |
+| `query-store-coupons` | `storeCode` + `beType` + `orderType` | `storeCode` 必须全数字 |
+
+### 7.8 业务错误不在 HTTP 层
+
+失败时 `HTTP 200` 但 body 里是：
+
+```json
+{"success": false, "code": 600048, "message": "外送场景下，beType=2/5/6时必传beCode",
+ "datetime": "...", "traceId": "..."}
+```
+
+**必须检查 `success` 字段**，不能只看 HTTP 状态码。
+
+### 7.9 响应是「散文 + 内嵌 JSON」的混合文本
+
+多个接口的返回不是纯 JSON，而是「说明文字 + JSON + 补充说明」拼起来的文本：
+
+```
+# API Response Information
+Below is the response from an API call...
+## Response Structure
+- **data**: ...
+{"success":true,"data":{...}}
+```
+
+解析必须用**括号配平**从文本中提取 JSON（找第一个 `{` 到配平的 `}`），
+**不能用正则贪婪匹配**（会抓到说明文字里的花括号导致解析失败）。
+
+### 7.10 其他实测观察
+
+1. **可领券不先领就不在卡包里**：`available-coupons` 的券要先
+   `auto-bind-coupons` 领取，才会出现在 `query-my-coupons`。
+2. **`takeWayList` 给出就餐方式**：核价返回 `eat-in`（堂食）/
+   `take-in-store`（外带），下单时要用对应 code。
+3. **图片 URL 带时效签名**：`q-ak=` / `q-signature=` 参数是 COS 签名，
+   有有效期，不应长期硬编码或当作静态资源引用。
+4. **历史订单可能为空**：新账号 `order-list` 返回空列表，依赖它的功能需空态兜底。
+
+---
+
+*本项目为麦当劳程序员节创意开发大赛参赛作品，由参赛者独立开发，非麦当劳官方产品。*
+*使用麦当劳 MCP 服务须遵守其《使用条款》与《麦当劳 MCP 服务规则》。*

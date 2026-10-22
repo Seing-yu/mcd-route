@@ -38,11 +38,20 @@ author: mcd-route contributors
 
 并行调用两个接口，拿全两个渠道的门店：
 
+**到店侧**（`query-nearby-stores`）：
 ```
-now-time-info                    # 拿当前时间，判断是否在营业/配送时段
-query-nearby-stores   {address}  # 到店自取候选门店
-delivery-query-stores {address}  # 外送候选门店（按收货地址）
+{ "beType": 1, "searchType": 2, "city": "北京", "keyword": "望京" }
 ```
+⚠️ **不接受 `address` 参数**（传了报 400「缺少参数」）。
+`searchType=2`（按位置搜索）时 `city` 与 `keyword` **必须成对**。
+返回含 `distance`（米）、`latitude` / `longitude`、`businessStatus`。
+
+**外送侧**（`delivery-query-addresses` → `delivery-query-stores`）：
+```
+delivery-query-addresses {}                              → data.addresses[]
+delivery-query-stores {"addressId": "...", "beType": 2}  → data[]
+```
+外送门店**多一个 `beCode` 字段**，后续算价必传。
 
 如果用户没给地址，先问，不要瞎猜。
 
@@ -50,33 +59,46 @@ delivery-query-stores {address}  # 外送候选门店（按收货地址）
 ```
 delivery-query-addresses         # 列出已有地址让用户选
 ```
+**不要**擅自调 `delivery-create-address`——它会向麦当劳发送姓名、手机号、详细地址。
 
 ### 第 2 步 · 拿券（关键，最容易漏）
 
 **券必须三路查全**，只查一路会漏掉最优解：
 
-| 来源 | 接口 | 说明 |
-|---|---|---|
-| 门店券 | `query-store-coupons` | **绑门店**，换店就变；实测部分仅到店可用 |
-| 账户券 | `query-my-coupons` | 已入卡包的券 |
-| 可领券 | `available-coupons` | 麦麦省里还没领的，**需先 `auto-bind-coupons` 领取**才会出现在卡包 |
+| 来源 | 接口 | 格式 | 渠道信息 |
+|---|---|---|---|
+| 门店券 | `query-store-coupons` | **纯 JSON** | JSON 里**没有**渠道字段 |
+| 账户券 | `query-my-coupons` | **Markdown** | 有「标签」字段 |
+| 可领券 | `available-coupons` | **Markdown** | 有「状态」字段 |
 
 拿 `available-coupons` 后，如果用户想用券，调 `auto-bind-coupons` 全部领取，
 再查一次 `query-my-coupons`——否则这些券在计算里是看不见的。
 
-### 第 3 步 · 拿菜单与配送费
+⚠️ **券是商品券，不是满减券**（实测确认）：
+- 券名里的「11.9元」是**用券价**，抵扣额 = 菜单原价 − 用券价
+- 券绑定 `products[].productCode`，**只对那个商品生效**
+- 买套餐时单品券用不上——**必须检查购物篮是否含绑定商品**
+
+⚠️ **标签可能是多标签**：「到店专用、外送专用」表示两个渠道都能用。
+判定时**必须先判多标签**，否则会先匹配到「外送」而误判成仅外送可用。
+
+### 第 3 步 · 拿菜单与算价
 
 ```
-query-meals {storeCode}          # 该门店在售餐品
-query-meal-detail {itemCode}     # 需要套餐明细时
+query-meals {"storeCode": "...", "beType": 1, "orderType": 1}
 ```
+外送时须带 `beCode`，且 `beType=2` / `orderType=2`。
 
-配送费与起送价来自 `calculate-price` 的返回（它会给出商品金额、配送费、优惠金额、应付总价）。
+配送费与起送价来自 `calculate-price` 的返回（商品金额、配送费、优惠金额、应付总价）。
 **不要自己猜配送费。**
 
 > ⚠️ **金额单位陷阱**：`calculate-price` 的金额是**分**，`query-meals` 的是**元**。
 > 混用会让每个金额差 100 倍。整理数据时用 `decider.py` 的
 > `parse_calculate_price()` 转换，不要手动除。
+>
+> ⚠️ **外送真实返回里有独立的打包费 `packingPrice`**（实测 ¥2.80），别漏算。
+>
+> ⚠️ **业务失败藏在 body 的 `success:false` 里，HTTP 仍是 200**——必须检查 `success` 字段。
 
 ### 第 4 步 · 交给脚本算
 
@@ -121,26 +143,30 @@ python scripts/decider.py --scenario <scenario.json> --minute-cost 0.5
 
 ## 关键实测经验
 
-以下是通过真实 MCP 联调得到的认知，直接影响正确性。
-**这些坑官方文档不会写**，必须靠实测撞出来：
+以下全部为 **2026-10-22 用真实 Token 实测**确认（原始快照见
+`scripts/sample_data/real_snapshot.json`，24 项回归断言锁定）：
 
 1. **金额单位按工具区分**：只有 `calculate-price` 返回「分」，
-   `query-meals` / `query-meal-detail` / `create-order` 已是「元」。
-   混用会让每个金额差 100 倍。用 `parse_calculate_price()` 统一转换。
-2. **券有场景属性**：实测部分门店券仅到店可用。外送场景必须剔除这些券，
-   否则会报出实际用不了的低价。
-3. **券要四路查全**：`available-coupons` 里的券要先 `auto-bind-coupons` 领，
-   不领就不在 `query-my-coupons` 里。
-4. **门店券绑门店**：换一家门店取到的券完全不同，所以**两个渠道要分别查券**。
-5. **起送价是硬约束**：外送未达起送价就不可用，到店没有这个限制。
-6. **历史订单可能为空**：新账号 `order-list` 返回空列表，依赖它的功能要有空态兜底。
-7. **响应不一定是纯 JSON**：部分 Tool 返回「散文说明 + 内嵌 JSON」的混合文本，
-   要先提取 JSON 再解析。
-8. **`query-nearby-stores` 参数联动**：`searchType=2` 时 `city` 与 `keyword`
-   必须成对提供。
-9. **券要作为独立 item 参与算价**：引用券需以独立商品项传入
-   `{productCode, quantity:1, couponId, couponCode}`，挂在普通餐品上无效。
-10. **只取最优单张券，不叠券**：本 Skill 刻意不做券组合叠加，保守计价，
+   `query-meals` 等已是「元」。混用会让每个金额差 100 倍。
+2. **券是商品券**：绑定 `products[].productCode`，券名里的「11.9元」是用券价。
+   抵扣额 = 菜单原价 − 用券价；**购物篮不含绑定商品时这张券用不上**。
+3. **券可能多标签**：「到店专用、外送专用」= 两个渠道都能用。
+   判定必须先判多标签。
+4. **两个券接口格式不同**：`query-store-coupons` 是纯 JSON，
+   `query-my-coupons` / `available-coupons` 是 Markdown，要分别解析。
+5. **两个渠道的券池相同**（同一批卡包券），但**绑定的门店不同**——
+   门店券仍需按渠道分别查。
+6. **外送有独立的打包费** `packingPrice`（实测 ¥2.80），别漏算。
+7. **`query-nearby-stores` 不接受 `address`**，必传 `beType` + `searchType`；
+   `searchType=2` 时 `city` 与 `keyword` 必须成对。
+8. **外送算价必须传 `beCode`**，否则报 600048。
+9. **门店接口确实返回 `distance`**（米）与经纬度，往返时间可据此推算。
+10. **业务错误不在 HTTP 层**：`success:false` + `code`/`message`，HTTP 仍是 200。
+11. **响应是「散文 + 内嵌 JSON」的混合文本**，解析要用**括号配平**，
+    不能用正则贪婪匹配（会抓到说明文字里的花括号）。
+12. **可领券不先领就不在卡包里**：`available-coupons` 的券要先
+    `auto-bind-coupons` 领取。
+13. **只取最优单张券，不叠券**：本 Skill 刻意不做券组合叠加，保守计价，
     保证报出的价格一定能真实成交。
 
 ## 文件说明
@@ -148,7 +174,7 @@ python scripts/decider.py --scenario <scenario.json> --minute-cost 0.5
 ```
 scripts/mcp_client.py   纯标准库 MCP 客户端（握手 / tools/list / tools/call）
 scripts/decider.py      决策引擎：渠道计价、对比、券体检
-scripts/selftest.py     84 项自测，改逻辑后必跑
+scripts/selftest.py     111 项自测，改逻辑后必跑
 scripts/mcp_probe.py    连通性自检：证明数据链路是真的
 scripts/sample_data/    离线样例，无需 Token 即可跑通全流程
 references/mcp-tools.md Tool 清单与字段映射
