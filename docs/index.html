@@ -409,8 +409,12 @@
     }
     var v = compare(d,p);
     if (isLive && LIVE.deliveryUnavailable){
+      // 真实场景的文案必须区分「接口原始返回」与「本页计算结果」：
+      // 核价接口返回的是未用券的 4650 分（¥46.50），
+      // 券抵扣 10.6 元是本页的算法算出来的，两者不能混为一谈。
       v = {pick:"pickup", big:"建议到店自取（外送侧未实采）",
-        text:"到店到手价 ¥"+fmt(p.total)+"（真实核价 price="+Math.round(p.total*100)+"，单位分）。"
+        text:"接口核价返回 ¥"+fmt(LIVE.price)+"（calculate-price 原始返回 price="+LIVE.price*100+"，单位分），"
+           +"其中 11.9元麦辣鸡腿堡券可抵扣 ¥10.60，到手 ¥"+fmt(p.total)+"。"
            +"距门店 "+LIVE.travel+" 分钟步行 + 出餐 "+prepP+" 分钟，共 "+p.minutes+" 分钟，"
            +"按每分钟 ¥"+fmt(mc)+" 折算时间成本 ¥"+fmt(p.timeCost)+"，总成本 ¥"+fmt(p.grand)+"。"
            +LIVE.deliveryUnavailable+"。"};
@@ -518,10 +522,12 @@
     render();
     $("srcLine").innerHTML = "当前：<b>真实实采数据</b> · 2026-10-23 经 WorkBuddy 原生 MCP 通道（mcp__mcd-mcp__*）实采 · "
       + "门店：麦当劳北京望京街餐厅 storeCode=1950980 · 核价 calculate-price 返回 price=4650（分）= ¥46.50 · "
-      + "券：query-store-coupons 返回 data:[]（该门店到店渠道无券）";
+      + "券：query-store-coupons 返回 2 张（11.9元麦辣鸡腿堡 / 19.9元王牌炸鸡任选2）· "
+      + "距离：query-nearby-stores 返回 distance 字段（312~1215 米）";
     $("modeBanner").className = "banner ok";
     $("modeBanner").innerHTML = "<strong>当前载入的是真实数据</strong>：来自 2026-10-23 通过 WorkBuddy 原生 MCP 通道的实际调用。"
-      + "本页依然是纯静态页面 —— 所有数字都硬编码在文件里，不会实时请求麦当劳服务器。";
+      + "本页依然是纯静态页面 —— 所有数字都硬编码在文件里，不会实时请求麦当劳服务器，"
+      + "也不需要你的 Token。";
   });
 
   $("loadDemo").addEventListener("click", function(){
