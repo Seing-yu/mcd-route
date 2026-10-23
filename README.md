@@ -428,7 +428,9 @@ python real_run.py             # 用【你自己的】账号跑真实链路
 ├── workbuddy.md                 # WorkBuddy 开发对话上下文
 ├── docs/
 │   ├── index.html               # ← 在线试算页（单文件，零外部依赖）
-│   ├── 推广物料.md               # 冲 Star 用素材
+│   ├── 推广物料.md               # 冲 Star 用素材（双活动通用）
+│   ├── 社媒文案.md               # 带话题标签的分享文案（拿社媒加分）
+│   ├── 造物挑战投稿清单.md        # 另一赛事的投稿材料与截图建议
 │   └── mcp-rules-20251203.html  # 官方 MCP 服务规则存档（纯文本离线版）
 └── skills/mcd-route/            # ← Skill 本体
     ├── SKILL.md                 # 技能指令（Agent 加载）
