@@ -614,6 +614,37 @@ check("仓库内无个人隐私信息（手机号/身份证/邮箱）", not _pii
 check("官方规则快照已排除在隐私扫描外（客服邮箱属官方信息）",
       _SKIP_SCAN and os.path.exists(os.path.join(_repo_root, "docs", "mcp-rules-20251203.html")))
 
+# --- 静态页面不得有第三方外发 ---
+# 试算页与规则存档都随 GitHub Pages 对外发布。规则存档原本是官方页面的
+# 整页快照，会连带引入微信 / 支付宝 / 腾讯地图定位 / 麦当劳 CDN 的脚本
+# （且内含官方地图 API key），访客打开即向多个第三方发起请求。
+# 已改为纯文本离线存档，这里用断言把「零外部脚本」锁死，防止被改回去。
+for _page in ("docs/index.html", "docs/mcp-rules-20251203.html"):
+    _pp = os.path.join(_repo_root, *_page.split("/"))
+    if not os.path.exists(_pp):
+        check(f"{_page} 存在", False, _pp)
+        continue
+    with open(_pp, encoding="utf-8", errors="ignore") as fh:
+        _ptxt = fh.read()
+    _ext_scripts = re.findall(r'<script[^>]+src\s*=\s*["\']https?://', _ptxt)
+    check(f"{_page} 无外部脚本引用", not _ext_scripts,
+          f"{len(_ext_scripts)} 个外部 script")
+    _net_calls = re.findall(r"\bfetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket",
+                            _ptxt)
+    check(f"{_page} 无网络外发调用", not _net_calls,
+          "; ".join(_net_calls[:3]))
+    _map_keys = re.findall(r"key\s*=\s*[A-Za-z0-9\-]{20,}", _ptxt)
+    check(f"{_page} 不含第三方 API key", not _map_keys,
+          "; ".join(_map_keys[:2]))
+
+# 规则存档必须保留完整八条
+_rules_path = os.path.join(_repo_root, "docs", "mcp-rules-20251203.html")
+if os.path.exists(_rules_path):
+    with open(_rules_path, encoding="utf-8", errors="ignore") as fh:
+        _rules = fh.read()
+    for _i, _cn in enumerate("一二三四五六七八", start=1):
+        check(f"规则存档含第{_cn}条", f"第{_cn}条" in _rules)
+
 
 # ---------------------------------------------------------------- 输出
 print(f"自测结果：{PASSED} 通过，{len(FAILED)} 失败")

@@ -5,7 +5,7 @@
 >
 > 麦当劳程序员创意开发大赛参赛作品 · 非麦当劳官方产品。
 
-![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![自测](https://img.shields.io/badge/selftest-137%20passed-success) ![License](https://img.shields.io/badge/license-MIT-green)
+![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![自测](https://img.shields.io/badge/selftest-151%20passed-success) ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
@@ -126,6 +126,14 @@ powershell -ExecutionPolicy Bypass -File .\skills\mcd-route\scripts\setup_mcp.ps
 > 仓库里的 `mcp-config.example.json` 保留占位符是为了**不泄露真实 Token**，
 > 供他人复制时替换用。
 >
+> ⚠️ **另有一处与官方 README 不同：`type` 字段用 `http` 而非 `streamablehttp`。**
+> 官方文档给的是 `"type": "streamablehttp"`，但读 WorkBuddy 桌面端源码
+> （`toUserServerForm`）确认，它只接受 `stdio` / `sse` / `http` 三个值。
+> 写 `streamablehttp` 时 `toTransport` 会把它归到 `http` 分支（恰好能连），
+> 但 UI 回写配置时会改写成 `http`，属于不一致状态。
+> 本仓库统一用 `http` —— 实测握手成功（协议 2025-06-18，35 个 Tool 全在线）。
+> **用官方那份配置连不上时，把 `streamablehttp` 改成 `http` 试试。**
+>
 > **为什么推荐用凭据文件而不是把 Token 贴进对话**：
 > MCP Token 与你的麦当劳会员账号强绑定，等同于账号操作权限。
 > 对话内容会经过第三方模型服务商处理，凭据文件则完全在你的机器上。
@@ -144,6 +152,57 @@ cp -r skills/mcd-route ~/.workbuddy/skills/
 ```
 
 装好后在对话框里直接说「**点外卖还是去店里更划算**」即可触发。
+
+---
+
+## 三种使用方式
+
+> 这是一个 **Agent Skill**，不是一个网站或小程序。官方要的形态就是 Skill
+> （「基于麦当劳 MCP 能力开发创意 Skill，开源到 GitHub」）。
+> 但"怎么用"这件事有三种层次，都给你备好了。
+
+### 方式 A · 在 WorkBuddy 里对话（正式形态，也是官方要的形态）
+
+这是**唯一能拿到真实数据**的方式。装好 Skill + 连上 MCP 之后，
+你在对话框里正常说话，它自己去调麦当劳的 Tool：
+
+```
+你：我晚上想吃麦当劳，点外送还是自己去店里？
+```
+
+它会依次调用 `query-nearby-stores` → `query-meals` → `query-store-coupons`
+→ `calculate-price`，然后给你一个带数字的结论。
+
+**真实调用过程**（2026-10-23 实采，可在
+[`docs/index.html`](docs/index.html) 的「在 WorkBuddy 里，它长这样」看到）：
+
+| Tool | 实参 | 返回 |
+|---|---|---|
+| `query-nearby-stores` | `city=北京, keyword=望京, beType=1` | 5 家门店，含 distance（米） |
+| `query-meals` | `storeCode=1950980, orderType=1, beType=1` | 11 分类 118 款餐品 |
+| `query-store-coupons` | `storeCode=1950980` | `data:[]`（该门店到店渠道无券） |
+| `calculate-price` | 3 件商品 | `price=4350`（分）= ¥43.50 |
+
+### 方式 B · 命令行跑决策（无需 Token也能跑通）
+
+```bash
+python skills/mcd-route/scripts/decider.py \
+  --scenario skills/mcd-route/scripts/sample_data/scenario.json \
+  --minute-cost 0.5
+```
+
+输出结构化 JSON，含 `verdict`（结论 + 理由）、`coupon_audit`（券体检）。
+用 `sample_data/live_20261023.json` 可以跑出**真实数据**的决策。
+
+### 方式 C · 打开在线试算页（零门槛，给评审和围观群众）
+
+访问 `docs/index.html`（GitHub Pages 开启后就是一条链接），
+拖动参数立刻看到结论。**不需要 Token、不联网、不收集任何东西。**
+
+页面上有两个可切换的数据源：
+- **样例数据**：虚构场景，演示算法
+- **真实实采数据**：2026-10-23 原生 MCP 通道实采的那一组，
+  点「载入真实实采数据」即可看到真实数字跑出来的结果
 
 ---
 
@@ -231,7 +290,7 @@ python decider.py --pretty
 python decider.py --minute-cost 0
 python decider.py --minute-cost 1.67
 
-# 跑 137 项自测（改逻辑后必跑）
+# 跑 151 项自测（改逻辑后必跑）
 python selftest.py
 
 # 前后端对拍：验证在线试算页与 CLI 结果一致（需 Node）
@@ -268,7 +327,7 @@ python real_run.py --city 北京 --keyword 望京
 | MCP 客户端握手 | ✅ **真实实测** | 协议 2025-06-18，服务器 `mcd-mcp` v1.0.0，35 个 Tool |
 | **WorkBuddy 原生 MCP 通道** | ✅ **真实实测** | 通过连接器 `mcd-mcp`（`mcp__mcd-mcp__*`）实调 4 个 Tool 成功，见 `sample_data/live_20261023.json` |
 | 端到端链路走查 | ✅ **真实实测** | `real_run.py` 12 次真实调用跑通，**全程只读** |
-| 渠道计价与对比 | ✅ 真实 | `decider.py` 纯标准库实现，137 项自测覆盖各决策分支 |
+| 渠道计价与对比 | ✅ 真实 | `decider.py` 纯标准库实现，151 项自测覆盖各决策分支 |
 | 页面与 CLI 一致 | ✅ 真实 | `parity_check.py` 逐场景对拍两端（56 项比对），防止两份实现漂移 |
 | 真实数据回归 | ✅ **真实实测** | 24 项断言锁定真实接口契约，见 `sample_data/real_snapshot.json` |
 | **两次独立采集交叉验证** | ✅ **真实实测** | 10-22 脚本采集 vs 10-23 原生通道采集，到店核价返回字段集完全一致 |
@@ -335,6 +394,76 @@ python real_run.py              # 用【你自己的】账号跑真实链路
 | 门店位置 | 真实快照已中性化；**但 `real_run.py` 与 `SKILL.md` 保留「望京」作为接口调用示例**——麦当劳北京望京店是公开门店，任何人都能照着跑通 |
 
 > 保留示例位置是有意的：它是**可复现的调用示例**，不是隐私。
+
+---
+
+## 🔐 你的凭据与个人信息安全
+
+> 这一节回答一个评审一定会问、也一定会被人担心的问题：
+> **「把我的 Token 放进去，会不会被人爬走？」**
+
+### 一、Token 会不会随仓库泄露？—— 不会，且是机器验证过的
+
+| 防护层 | 具体做法 | 验证方式 |
+|---|---|---|
+| 仓库内 | 只有 `Bearer ${MCD_MCP_TOKEN}` 占位符 | 自测断言扫描全仓库 |
+| **git 全历史** | 12 个提交逐个 diff 扫描，0 处真实 Token | `git log --all -p` 全量 grep |
+| 本地存放 | `~/.workbuddy/.mcd_token`（不在任何 git 仓库内） | 路径断言 |
+| 桌面端配置 | `~/.workbuddy/mcp.json`（明文，但在仓库外） | 路径断言 |
+| 推送到 GitHub 前 | `setup_token.py` 交互式写入，**Token 不经过对话、不经过剪贴板** | `getpass` 不回显 |
+
+**实测结论**（2026-10-23 复扫）：git 全部历史中所有 `Bearer` 命中项均为
+代码模板或占位符，**零真实 Token**。
+
+### 二、那"别人用我的项目"会不会把我的信息传出去？—— 不会
+
+这是最容易误解的一点，展开说：
+
+**本项目没有服务端、没有数据库、没有上传接口。**
+它不是一个"网站"，是一堆**跑在你自己机器上的文件**。
+
+| 环节 | 数据流向 | 谁能拿到 |
+|---|---|---|
+| Token | `~/.workbuddy/` → `mcp.mcd.cn` 请求头 | 只有麦当劳服务器 |
+| 你的地址 | 你**主动**给 → `mcp.mcd.cn` | 只有麦当劳服务器 |
+| 门店/菜单/价格 | `mcp.mcd.cn` → 本地内存 | 无人 |
+| 试算页 | **全部计算在浏览器本地**，不发任何请求 | 无人 |
+| 样例数据 | 硬编码在仓库里，公开可读 | 所有人（本来就不是隐私） |
+
+**试算页 `docs/index.html` 的实测**：零 `fetch`、零 `XMLHttpRequest`、
+零外部 `<script src>`。你拖动的每个参数只存在于浏览器内存，刷新即消失。
+
+**规则快照 `docs/mcp-rules-20251203.html`**：原页面是 JS 渲染的，
+直接存档会把官方页面的第三方脚本（微信 / 支付宝 / 腾讯地图定位 / 麦当劳 CDN）
+一并带进来——访客打开时会向 4 个第三方发起请求，且内含官方的地图 API key。
+**本仓库已改为纯文本离线存档**：只保留规则正文，
+实测 `0` 个外部脚本、唯一外链是 `open.mcd.cn/mcp` 原文地址。
+
+### 三、有没有"接收别人 Token / 地址"的接口？—— 结构上不存在
+
+| 提问 | 事实 |
+|---|---|
+| 有没有让用户填 Token 的网页表单？ | **没有**。唯一涉及 Token 的入口是本地终端脚本（`setup_token.py` / `setup_mcp.ps1`），写入本地文件，不经过浏览器 |
+| 有没有收集地址的接口？ | **没有**。`delivery-query-addresses` 是**麦当劳官方 MCP 的 Tool**，本项目只调用它、不实现它，也不把地址落盘 |
+| 有没有后端？ | **没有**。全仓库无 `flask` / `fastapi` / `express` / 数据库 / 上传逻辑 |
+| 别人 fork 了这个仓库，他的 Token 会传到哪？ | **他自己的** `~/.workbuddy/`，和你的完全隔离。仓库里没有我的服务端可以收集 |
+
+### 四、你的个人信息会不会被我（AI）读到？
+
+官方规则第五条要求：**请勿在与 AI 的对话中输入 MCP Token**。
+
+本项目从设计上遵守：Token 通过本地脚本写入凭据文件，
+**不进入对话、不经过第三方模型服务商**。
+`selftest.py` 会扫描全仓库确认没有真实 Token 形态的字符串。
+
+至于**配送地址**——它属于你的个人数据。
+Skill **不会主动索取**：查外送需要 `addressId`，
+拿不到时它只做到店侧，并在结论里明说"外送侧未采集，原因是什么"，
+不会用猜测值凑一个方案。
+
+> **一句话总结**：这个项目没有中心，没有服务器，没有数据出口。
+> 你的 Token 从你的机器直接到麦当劳服务器，中间不经过任何人 ——
+> 包括我。
 
 ---
 
@@ -427,7 +556,7 @@ python real_run.py              # 用【你自己的】账号跑真实链路
     ├── scripts/
     │   ├── mcp_client.py          # 纯标准库 MCP 客户端（握手/工具列表/调用/合规护栏）
     │   ├── decider.py             # 决策引擎：渠道计价、对比、券体检、单位归一化
-    │   ├── selftest.py            # 137 项自测
+    │   ├── selftest.py            # 151 项自测
     │   ├── parity_check.py        # 前后端对拍（页面 vs CLI）
     │   ├── parity_check.mjs       # 前端计算引擎抽取器
     │   ├── setup_token.py         # 交互式配置 Token（不回显，不进对话）
@@ -451,7 +580,7 @@ python real_run.py              # 用【你自己的】账号跑真实链路
 - **券的场景建模** —— 建模 `channel` 字段，解决「券用不了」这个真实痛点。
 - **保守计价** —— 不叠加券、不猜价格，宁可少报优惠也不给假低价。
 - **诚实降级** —— 起送价未达标、距离不可得、字段缺失，都有明确的降级说明。
-- **137 项自测** —— 覆盖券可用性、选券策略、计价、决策分支、字段归一化、金额单位契约、合规护栏七类。
+- **151 项自测** —— 覆盖券可用性、选券策略、计价、决策分支、字段归一化、金额单位契约、合规护栏、**静态页无外发**八类。
 - **前后端对拍** —— 在线试算页与 CLI 是同一套逻辑，逐场景比对 56 项，防止漂移。
 
 ---
