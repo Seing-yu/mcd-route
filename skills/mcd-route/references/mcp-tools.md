@@ -146,6 +146,35 @@
 | `query-store-coupons` | ✅ | 返回 JSON 格式券列表 |
 | `available-coupons` | ✅ | 返回 Markdown 格式可领券列表 |
 
+### 7.1.1 原生 MCP 通道实采（2026-10-23）
+
+以上是**脚本**采集（10-22）。10-23 装好 WorkBuddy 自定义连接器后，
+**通过原生通道 `mcp__mcd-mcp__*` 再采一次**，两个独立途径互相印证。
+快照见 `scripts/sample_data/live_20261023.json`。
+
+| Tool | 实参 | 实测返回 |
+|---|---|---|
+| `now-time-info` | — | 服务器时间 2026-10-23 09:14:29，GMT+08:00 |
+| `query-nearby-stores` | `beType=1, searchType=2, city=北京, keyword=望京` | 5 家门店，**distance 字段**（312/611/847/943/1215 米），含 `businessStatus`、`reservationTimeOptions` |
+| `query-meals` | `storeCode=1950980, orderType=1, beType=1` | 11 个分类、118 款；`currentPrice`/`originalPrice`/`discountType` 齐全 |
+| `query-store-coupons` | `storeCode=1950980` 与 `1950980` | 均返回 `data:[]` |
+| `calculate-price` | 3 件商品, `orderType=1, beType=1` | `price=4350`（分）→ ¥43.50；`takeWayList` = 堂食/外带 |
+
+**这次实采确认的三件事**
+
+1. **到店核价返回不含 `deliveryPrice` / `packingPrice`**
+   —— 这两个字段**只有外送才有**。`parse_calculate_price()` 遇缺失字段
+   会写入 `notes` 并给 0，**不猜不估**。这正是"保守计价"原则的落点。
+2. **`query-store-coupons` 返回 `data:[]` 是真实业务状态，不是接口异常**
+   —— 换第二家门店交叉验证同样为空。说明该会员在这两家门店的
+   到店渠道下确实无可用券。**不能把空数组当成"查询失败"来重试。**
+3. **两次独立采集的到店核价返回字段集完全一致**
+   （10-22 脚本 vs 10-23 原生通道），已写成自测断言锁定。
+
+**外送侧本次未采集**：`delivery-query-stores` 需要
+`delivery-query-address` 返回的 `addressId`，属用户个人地址，
+须用户主动提供，不代为猜测或预置。
+
 ### 7.2 金额单位契约（最容易踩的坑）
 
 **麦当劳 MCP 的金额单位按工具区分，不能一概处理：**
