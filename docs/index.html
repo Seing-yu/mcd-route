@@ -113,6 +113,26 @@
   .priv .box code{background:var(--bg-3); padding:1px 5px; border-radius:4px; font-size:11px; word-break:break-all}
   .dot{width:7px; height:7px; border-radius:50%; flex:none}
   .dot.g{background:#1a7f37} .dot.b{background:var(--blue-bd)} .dot.y{background:var(--amber-bd)}
+  /* ---- 使用引导 ---- */
+  .intro{background:var(--bg-2)}
+  .steps{margin:0; padding-left:1.3em; font-size:14px; line-height:1.9}
+  .steps li{margin-bottom:2px}
+  .steps b{font-weight:500; color:var(--tx)}
+  h2 .step{
+    font-size:12px; font-weight:400; color:var(--tx-3);
+    margin-left:8px; letter-spacing:0;
+  }
+  /* ---- 场景故事 ---- */
+  .scenario{
+    background:var(--bg-2); border-radius:10px; padding:14px 16px;
+    border:.5px solid var(--bd);
+  }
+  .scenario.out{background:var(--teal-bg); border-color:var(--teal-bd)}
+  .scenario .who{font-size:11px; color:var(--tx-3); margin-bottom:7px}
+  .scenario.out .who{color:var(--teal)}
+  .scenario p{margin:0 0 8px; font-size:13.5px; line-height:1.75}
+  .scenario p:last-child{margin-bottom:0}
+  .scenario b{font-weight:500}
 </style>
 </head>
 <body>
@@ -127,6 +147,21 @@
   本页为<strong>离线演示</strong>：使用样例数据，不连接麦当劳接口、不读取你的账户。真实数据需在本地配置 MCP Token 后运行 <code>mcp_probe.py</code>。
 </div>
 
+<div class="card intro">
+  <h2>三步算出「这一顿该点外送还是自己跑一趟」</h2>
+  <ol class="steps">
+    <li><b>选场景</b> —— 载入一组真实门店数据，或直接拖动下面的参数</li>
+    <li><b>调参数</b> —— 配送费、起送价、等餐时间、每分钟时间成本</li>
+    <li><b>看结论</b> —— 顶部会给出到手价对比与建议，含时间成本折算</li>
+  </ol>
+  <p class="note" style="margin-top:14px">
+    <b>它解决的是被忽略的问题</b>：所有点餐助手都在比「哪家店怎么点更便宜」，
+    但很少有人回答「我到底该点外送还是自己跑一趟」。
+    券是<strong>绑商品、还分渠道</strong>的（一张到店券在外送根本用不了），
+    再加上配送费、打包费、起送价和你的时间成本 —— 差价常常不在你以为的地方。
+  </p>
+</div>
+
 <div class="verdict" id="verdict">
   <span class="tag">计算中</span>
   <p class="big" id="vBig">—</p>
@@ -134,7 +169,7 @@
 </div>
 
 <div class="card">
-  <h2>载入真实数据</h2>
+  <h2>第 1 步 · 载入真实数据</h2>
   <p class="note" style="margin-top:0">下面这组参数<strong>来自 2026-10-23 通过 WorkBuddy 原生 MCP 通道的实采</strong>（麦当劳北京望京街餐厅，storeCode <code>1950980</code>）。点一下就能看到真实数据跑出来的结果。</p>
   <div class="row" style="margin-top:12px">
     <button class="btn primary" id="loadLive">载入真实实采数据</button>
@@ -144,7 +179,7 @@
 </div>
 
 <div class="card">
-  <h2>这一顿吃什么</h2>
+  <h2>第 2 步 · 这一顿吃什么</h2>
   <div class="grid g3">
     <div>
       <label class="f" for="itemName">餐品</label>
@@ -162,7 +197,7 @@
 </div>
 
 <div class="card">
-  <h2>外送条件</h2>
+  <h2>外送条件 <span class="step">配送费 / 起送价 / 等餐</span></h2>
   <div class="grid g3">
     <div>
       <label class="f" for="fee">配送费（元）<span class="val" id="feeV"></span></label>
@@ -180,7 +215,7 @@
 </div>
 
 <div class="card">
-  <h2>到店条件</h2>
+  <h2>到店条件 <span class="step">出餐 / 往返 / 时间单价</span></h2>
   <div class="grid g3">
     <div>
       <label class="f" for="prepP">出餐时间（分钟）<span class="val" id="prepPV"></span></label>
@@ -199,7 +234,7 @@
 </div>
 
 <div class="card">
-  <h2>你的券</h2>
+  <h2>你的券 <span class="step">勾掉试试，结论会跟着变</span></h2>
   <p class="note" style="margin-top:0">注意最后一张：<strong>到店券在外送场景根本用不了</strong>。这是多数省钱助手会算错的地方。</p>
   <table>
     <thead><tr><th style="width:38%">券</th><th style="width:14%">抵扣</th><th style="width:14%">门槛</th><th style="width:20%">适用渠道</th><th style="width:14%">开关</th></tr></thead>
@@ -208,7 +243,7 @@
 </div>
 
 <div class="card">
-  <h2>计价拆解</h2>
+  <h2>第 3 步 · 看结论 <span class="step">到手价与时间成本逐项拆开</span></h2>
   <table>
     <thead><tr><th style="width:26%">项目</th><th style="width:37%">外送</th><th style="width:37%">到店自取</th></tr></thead>
     <tbody id="breakdown"></tbody>
@@ -221,6 +256,29 @@
     <thead><tr><th style="width:36%">券</th><th style="width:16%">名义面额</th><th style="width:24%">实际能用</th><th style="width:24%">结论</th></tr></thead>
     <tbody id="audit"></tbody>
   </table>
+</div>
+
+<div class="card">
+  <h2>一个具体的场景 <span class="step">为什么这件事值得算</span></h2>
+  <div class="grid g2" style="margin-top:12px">
+    <div class="scenario">
+      <div class="who">你</div>
+      <p>下班路上想吃麦当劳。App 里外送要 <b>¥46.50</b>，配送费加打包费 <b>¥8.8</b>，还差 3.5 元起送。
+      可惜你手上有张 <b>11.9 元麦辣鸡腿堡券</b> —— 但它是<strong>到店券</strong>，外送用不了。</p>
+      <p>你看了眼地图：最近的店 <b>312 米</b>，走过去 5 分钟，出餐 8 分钟。</p>
+    </div>
+    <div class="scenario out">
+      <div class="who">麦门渠道官</div>
+      <p><b>建议到店自取。</b>券能用上，抵扣 10.6 元，到手 <b>¥35.90</b>，
+      比外送少 11.4 元，还省 20 分钟等餐。</p>
+      <p>如果你时薪 100 元，那 13 分钟的时间成本是 13 元 —— <b>更该自己去</b>。
+      如果你完全不在乎时间，结论可能反过来。</p>
+    </div>
+  </div>
+  <p class="note">
+    同一单饭，<strong>换个人的时间观，答案就变了</strong>。这就是这个工具和
+    「比价助手」的根本区别：它不告诉你哪个便宜，它告诉你<strong>哪个对你更划算</strong>。
+  </p>
 </div>
 
 <div class="card">
