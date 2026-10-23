@@ -240,15 +240,15 @@
         <code>query-meals</code> storeCode=1950980 orderType=1 beType=1<br>
         → 11 个分类 118 款餐品<br>
         <code>query-store-coupons</code> storeCode=1950980<br>
-        → <code>data:[]</code>（这家店到店渠道当前无券）<br>
+        → 2 张券（11.9元麦辣鸡腿堡 / 19.9元王牌炸鸡任选2）<br>
         <code>calculate-price</code> 3 件商品 orderType=1 beType=1<br>
-        → <code>price=4350</code>（分）= ¥43.50
+        → <code>price=4650</code>（分）= ¥46.50
       </div>
     </div>
     <div class="msg bot">
       <div class="who">麦门渠道官</div>
       <div class="verdict-line">建议到店自取。</div>
-      这一单到店到手价 <b>¥43.50</b>，比外送少 —— 外送要加配送费和打包费，而你这单在到店渠道没券可用、外送渠道也未必有。
+      这一单到店到手价 <b>¥46.50</b>，比外送少 —— 外送要加配送费和打包费，而你这单在到店渠道有 11.9 元券可用，能直接抵掉 10.6 元。
       <br><br>
       距离 312 米，按步行 5 分钟算，加上出餐 8 分钟，<b>总共 13 分钟</b>就能吃到。按每分钟 0.5 元折算，你的时间成本是 ¥6.50。
       <br><br>
@@ -467,10 +467,10 @@
 
   // ---- 真实数据一键载入（2026-10-23 原生 MCP 通道实采）----
   // 数值来源：sample_data/live_20261023.json
-  // 到店核价 price=4350（分）= ¥43.50，与 calculate-price 原始返回一致
+  // 到店核价 price=4650（分）= ¥46.50，与 calculate-price 原始返回一致
   var LIVE = {
     name: "猪柳蛋麦满分套餐 + 脆薯饼 + 可乐",
-    price: 43.5,
+    price: 46.5,
     qty: 1,
     fee: 0,          // 到店无配送费
     minOrder: 0,    // 到店无起送价
@@ -478,7 +478,12 @@
     prepP: 8,       // 到店出餐
     travel: 5,      // 312 米 → 步行约 5 分钟
     mc: 0.5,
-    coupons: [],    // 实测该门店到店渠道 data:[] → 无券
+    coupons: [
+      {id:"A255280326E3328D179C362B7B8DDA65", name:"11.9元麦辣鸡腿堡",
+       discount:10.6, threshold:22.5, channel:"any", on:true, usePrice:11.9},
+      {id:"44928824D2D4273FE5ECA617BBF75483", name:"19.9元王牌炸鸡任选2",
+       discount:0, threshold:0, channel:"any", on:false, usePrice:19.9}
+    ],   // 实测该门店到店渠道 2 张券（商品券，绑 1440 / 9900016534）
     // 外送侧本次【未实采】：查外送需要配送地址 addressId（个人数据，不主动索取）
     // 所以真实场景下外送是「不可用」而非「价格更高」，文案必须如实说明，不能假装比了个价
     deliveryUnavailable: "外送侧本次未实采 —— 查外送需要你的配送地址，属个人数据，不会主动索取"
@@ -512,7 +517,7 @@
     renderCoupons();
     render();
     $("srcLine").innerHTML = "当前：<b>真实实采数据</b> · 2026-10-23 经 WorkBuddy 原生 MCP 通道（mcp__mcd-mcp__*）实采 · "
-      + "门店：麦当劳麦当劳北京望京街餐厅 storeCode=1950980 · 核价 calculate-price 返回 price=4350（分）= ¥43.50 · "
+      + "门店：麦当劳北京望京街餐厅 storeCode=1950980 · 核价 calculate-price 返回 price=4650（分）= ¥46.50 · "
       + "券：query-store-coupons 返回 data:[]（该门店到店渠道无券）";
     $("modeBanner").className = "banner ok";
     $("modeBanner").innerHTML = "<strong>当前载入的是真实数据</strong>：来自 2026-10-23 通过 WorkBuddy 原生 MCP 通道的实际调用。"

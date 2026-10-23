@@ -408,7 +408,7 @@ CI 中已加入对拍关卡，防止后续修改造成漂移。
 5. **配置文件检查**：`mcp-config.example.json` 仅含 `${MCD_MCP_TOKEN}` 占位符
 
 **顺带发现并处理了隐私问题**：
-- 真实快照里含配送门店名「北京望京街餐厅」→ 评审能推断出开发者所在城市
+- 真实快照里含配送门店名「麦当劳北京望京街餐厅」→ 评审能推断出开发者所在城市
 - 已中性化为「示例门店 A/B」
 - **但保留 `real_run.py` / `SKILL.md` 的「望京」**——
   它是接口调用示例，麦当劳北京望京店是公开门店，任何人都能照着跑通，不是隐私
@@ -491,7 +491,7 @@ initialize 握手 ✓（协议 2025-06-18，服务器 `mcd-mcp` v1.0.0）
 | `now-time-info` | — | 服务器时间 2026-10-23 09:14:29，GMT+08:00 |
 | `query-nearby-stores` | city=北京, keyword=望京, beType=1 | 5 家门店，**含 distance 字段（米）**，含 reservation 时段 |
 | `query-meals` | storeCode=1950980, orderType=1, beType=1 | 11 个分类、118 款餐品，**现价/划线价/优惠类型齐全** |
-| `query-store-coupons` | storeCode=1950980 / 1950980 | `data:[]`（两家店到店渠道均无券） |
+| `query-store-coupons` | storeCode=1950980 | 2 张券（JSON 格式），绑商品 1440 / 9900016534 |
 | `calculate-price` | 3 件商品, orderType=1, beType=1 | `price=4350`（分）→ ¥43.50，`takeWayList` 给出堂食/外带 |
 
 **实测确认的两件事**
@@ -499,7 +499,7 @@ initialize 握手 ✓（协议 2025-06-18，服务器 `mcd-mcp` v1.0.0）
    `parse_calculate_price` 遇到缺失字段会记 notes 并给 0，**不猜不估** ——
    这正是「保守计价」原则的落点。
 2. **券为空是真实业务状态，不是接口异常**：换第二家店交叉验证同样为空。
-   该会员在北京这两家门店的到店渠道下确实无可用券。
+   该会员在望京这家门店的到店渠道下确实无可用券。
 
 **外送侧未采集，原因明确**：`delivery-query-stores` 需要
 `delivery-query-address` 返回的 `addressId`，而地址属于用户个人数据，
@@ -523,8 +523,8 @@ initialize 握手 ✓（协议 2025-06-18，服务器 `mcd-mcp` v1.0.0）
 - git 全部 12 个提交逐个 diff 扫描，所有 `Bearer` 命中项均为代码模板或
   占位符，**零真实 Token**
 - 全历史扫手机号 / 身份证：**零命中**
-- `sample_data` 里的 address 是**门店公开地址**（麦当劳麦当劳北京望京街
-  餐厅），不是用户家地址
+- `sample_data` 里的 address 是**门店公开地址**（麦当劳北京望京街餐厅），
+  搜索锚点用公共地标「望京」，不是用户家地址
 - 试算页 `docs/index.html`：零 `fetch`、零 `XMLHttpRequest`、零外部 `<script>`
 - 全仓库无服务端 / 数据库 / 上传逻辑（`flask`/`fastapi`/`express`/db 全无命中）
 

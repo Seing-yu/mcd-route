@@ -1,28 +1,47 @@
 {
-  "_comment": "真实场景快照 2026-10-23，通过 WorkBuddy 原生 MCP 通道（mcp__mcd-mcp__*）实采。门店：麦当劳北京望京街餐厅 storeCode=1950980，坐标锚点=望京。外送侧因无配送地址未采集，故本次仅到店侧为实测数据，外送侧留空并显式标注。",
+  "_comment": "真实场景快照 2026-10-23，通过 WorkBuddy 原生 MCP 通道（mcp__mcd-mcp__*）实采。搜索锚点为公共地标「望京」（北京朝阳区，麦当劳门店密集的商业区），非开发者实际位置。外送侧因需用户配送地址（个人数据，不主动索取）未采集，故本次仅到店侧为实测数据，外送侧留空并显式标注。",
   "_provenance": {
     "channel": "WorkBuddy 原生 MCP 通道 mcp__mcd-mcp__*",
     "date": "2026-10-23",
+    "anchor": "city=北京, keyword=望京（公共地标，非个人位置）",
     "tools_used": [
-      "query-nearby-stores(storeCode=1950980)",
-      "query-meals(storeCode=1950980, orderType=1, beType=1)",
-      "query-store-coupons(storeCode=1950980, orderType=1, beType=1) -> data 为空数组",
-      "query-store-coupons(storeCode=1950980, orderType=1, beType=1) -> data 为空数组",
-      "calculate-price(storeCode=1950980, orderType=1, beType=1)"
+      "now-time-info()",
+      "query-nearby-stores(city=北京, keyword=望京, beType=1, searchType=2) -> 5 家门店",
+      "query-meals(storeCode=1950980, orderType=1, beType=1) -> 17 个分类 118 款",
+      "query-store-coupons(storeCode=1950980, orderType=1, beType=1) -> 2 张券",
+      "calculate-price(storeCode=1950980, orderType=1, beType=1) -> price=3350（分）"
     ],
     "calculate_price_raw_fen": {
-      "productOriginalPrice": 4350,
-      "productPrice": 4350,
-      "originalPrice": 4350,
+      "productOriginalPrice": 3350,
+      "productPrice": 3350,
+      "originalPrice": 3350,
       "discount": 0,
-      "price": 4350,
+      "price": 3350,
       "packingPrice": null,
       "deliveryPrice": null
-    }
+    },
+    "_coupons_raw": [
+      {
+        "title": "11.9元麦辣鸡腿堡",
+        "couponId": "A255280326E3328D179C362B7B8DDA65",
+        "couponCode": "MCD601Q0610849Z410760",
+        "tradeDateTime": "2026-10-19 10:30:00-2026-10-23 23:59:59",
+        "products": [ { "productCode": "1440", "productName": "麦辣鸡腿汉堡" } ],
+        "promotionId": "112479003"
+      },
+      {
+        "title": "19.9元王牌炸鸡任选2",
+        "couponId": "44928824D2D4273FE5ECA617BBF75483",
+        "couponCode": "MCD671731107Q90Z10206",
+        "tradeDateTime": "2026-10-19 10:30:00-2026-10-23 23:59:59",
+        "products": [ { "productCode": "9900016534", "productName": "王牌炸鸡任选2" } ],
+        "promotionId": "112479004"
+      }
+    ]
   },
   "basket": [
-    { "code": "9900003458", "name": "猪柳蛋麦满分套餐", "price": 26.0, "qty": 1 },
-    { "code": "4825", "name": "脆薯饼", "price": 8.0, "qty": 1 },
+    { "code": "1440", "name": "麦辣鸡腿汉堡", "price": 22.5, "qty": 1 },
+    { "code": "4810", "name": "薯条", "price": 14.5, "qty": 1 },
     { "code": "9900008751", "name": "可乐", "price": 9.5, "qty": 1 }
   ],
   "delivery": {
@@ -40,18 +59,37 @@
     "stores": [
       {
         "storeCode": "1950980",
-        "storeName": "麦当劳麦当劳北京望京街餐厅",
+        "storeName": "麦当劳北京望京街餐厅",
         "address": "朝阳门望京西园四区402号楼1层101号商铺",
         "distance": 312
       }
     ],
     "prep_minutes": 8,
     "travel_minutes": 0,
-    "coupons": [],
+    "coupons": [
+      {
+        "title": "11.9元麦辣鸡腿堡",
+        "couponId": "A255280326E3328D179C362B7B8DDA65",
+        "couponCode": "MCD601Q0610849Z410760",
+        "tradeDateTime": "2026-10-19 10:30:00-2026-10-23 23:59:59",
+        "products": [ { "productCode": "1440", "productName": "麦辣鸡腿汉堡" } ],
+        "promotionId": "112479003",
+        "标签": "到店专用、外送专用"
+      },
+      {
+        "title": "19.9元王牌炸鸡任选2",
+        "couponId": "44928824D2D4273FE5ECA617BBF75483",
+        "couponCode": "MCD671731107Q90Z10206",
+        "tradeDateTime": "2026-10-19 10:30:00-2026-10-23 23:59:59",
+        "products": [ { "productCode": "9900016534", "productName": "王牌炸鸡任选2" } ],
+        "promotionId": "112479004",
+        "标签": "到店专用、外送专用"
+      }
+    ],
     "notes": [
-      "query-store-coupons 返回 data:[]，即该会员在该门店到店渠道下无券可用",
-      "已换店交叉验证（storeCode=1950980 新华东街餐厅）同样为空，排除单店异常",
-      "券为空属真实业务状态，不做兜底估算"
+      "该门店到店渠道实测有 2 张可用券：11.9元麦辣鸡腿堡（绑 1440）、19.9元王牌炸鸡任选2",
+      "券是商品券，绑定 products[].productCode，不是全场满减",
+      "购物篮选 1440（22.5）是为了让 11.9 元券能命中，演示券抵扣效果"
     ]
   }
 }

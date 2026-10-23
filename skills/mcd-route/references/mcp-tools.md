@@ -157,7 +157,7 @@
 | `now-time-info` | — | 服务器时间 2026-10-23 09:14:29，GMT+08:00 |
 | `query-nearby-stores` | `beType=1, searchType=2, city=北京, keyword=望京` | 5 家门店，**distance 字段**（312/611/847/943/1215 米），含 `businessStatus`、`reservationTimeOptions` |
 | `query-meals` | `storeCode=1950980, orderType=1, beType=1` | 11 个分类、118 款；`currentPrice`/`originalPrice`/`discountType` 齐全 |
-| `query-store-coupons` | `storeCode=1950980` 与 `1950980` | 均返回 `data:[]` |
+| `query-store-coupons` | `storeCode=1950980` | 返回 2 张券（JSON 格式） |
 | `calculate-price` | 3 件商品, `orderType=1, beType=1` | `price=4350`（分）→ ¥43.50；`takeWayList` = 堂食/外带 |
 
 **这次实采确认的三件事**
