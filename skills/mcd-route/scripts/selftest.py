@@ -308,7 +308,7 @@ if _live:
     check("原生通道快照:标注走 mcp__mcd-mcp__* 通道",
           "mcp__mcd-mcp__" in _prov["channel"], _prov["channel"])
     check("原生通道快照:字段名与 10-22 脚本采集一致",
-          _prov["calculate_price_raw_fen"]["productOriginalPrice"] == 4350
+          _prov["calculate_price_raw_fen"]["productOriginalPrice"] == 3350
           and "price" in _prov["calculate_price_raw_fen"])
 
     # 两次独立采集的到店核价返回，字段结构必须完全对齐
@@ -324,7 +324,7 @@ if _live:
           f"{sorted(_live_cp)} vs {sorted(_old_cp)}")
 
     _live_parsed = parse_calculate_price(_prov["calculate_price_raw_fen"])
-    check("原生通道快照:分转元正确", approx(_live_parsed["total"], 43.5),
+    check("原生通道快照:分转元正确", approx(_live_parsed["total"], 33.5),
           str(_live_parsed["total"]))
     check("原生通道快照:到店无配送费", approx(_live_parsed["delivery_fee"], 0.0))
     check("原生通道快照:到店无打包费", approx(_live_parsed["packing_fee"], 0.0))
@@ -655,6 +655,36 @@ for _f in _repo_files:
     _long_ids = re.findall(r"\b\d{15,}\b", _ftxt)
     check(f"{_f} 无长数字标识符（地址ID等）", not _long_ids,
           "; ".join(_long_ids[:3]))
+
+# --- 仓库不得含可定位到开发者本人的位置信息 ---
+# 2026-10-23 首次推送后才发现：实采快照里用了开发者实际位置作为
+# 搜索锚点（city + keyword），并记录了 distance（各门店距离值），
+# 两者结合可反推开发者当时所在位置。
+# 现在的规矩：**搜索锚点只能用公共地标**（如「望京」这种商圈名），
+# distance 可以保留（它相对公共地标而言），但不得出现个人的
+# 居住/工作地标词。已改为公共地标重采，并把这条固化为断言。
+_LOCATION_PATTERNS = [
+    # 个人居住/工作地标的常见写法（小区/家属院/学校/写字楼名）
+    ("家属院", re.compile(r"[\w一-鿿]{0,8}家属院")),
+    ("小区名", re.compile(r"[\w一-鿿]{0,8}小区")),
+    ("大学+路名组合", re.compile(r"[\w一-鿿]{1,6}大学[\w一-鿿]{0,4}[路街道]")),
+    ("距离锚点", re.compile(r"坐标锚点\s*[=＝]\s*(?!望京|北京)[\w一-鿿]+")),
+]
+for _f in _repo_files:
+    if not _f.endswith((".json", ".py", ".md", ".mjs", ".html")):
+        continue
+    if os.path.basename(_f) == "selftest.py":
+        continue  # 本文件含模式定义本身，会自匹配
+    _fp = os.path.join(_repo_root, _f)
+    try:
+        with open(_fp, encoding="utf-8", errors="ignore") as fh:
+            _ftxt = fh.read()
+    except OSError:
+        continue
+    for _label, _rx in _LOCATION_PATTERNS:
+        _hits = _rx.findall(_ftxt)
+        check(f"{_f} 无个人位置地标（{_label}）", not _hits,
+              "; ".join(str(h) for h in _hits[:2]))
 
 # 规则存档必须保留完整八条
 _rules_path = os.path.join(_repo_root, "docs", "mcp-rules-20251203.html")

@@ -5,7 +5,7 @@
 >
 > 麦当劳程序员创意开发大赛参赛作品 · 非麦当劳官方产品。
 
-![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![自测](https://img.shields.io/badge/selftest-173%20passed-success) ![License](https://img.shields.io/badge/license-MIT-green)
+![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![自测](https://img.shields.io/badge/selftest-253%20passed-success) ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
@@ -244,7 +244,7 @@ cd skills/mcd-route/scripts
 
 python decider.py --pretty                    # 看决策结果（内置样例数据）
 python decider.py --minute-cost 1.67          # 调时间单价（0=不在乎时间）
-python selftest.py                             # 跑 173 项自测
+python selftest.py                             # 跑 253 项自测
 python parity_check.py                         # 对拍：页面与 CLI 是否一致（需 Node）
 
 # 需 Token 的真实链路自检
@@ -275,7 +275,7 @@ python real_run.py                             # 端到端真实走查（12 次�
 | MCP 客户端握手 | ✅ **真实实测** | 协议 2025-06-18，服务器 `mcd-mcp` v1.0.0，35 个 Tool |
 | **WorkBuddy 原生 MCP 通道** | ✅ **真实实测** | 通过连接器 `mcd-mcp`（`mcp__mcd-mcp__*`）实调 4 个 Tool 成功，见 `sample_data/live_20261023.json` |
 | 端到端链路走查 | ✅ **真实实测** | `real_run.py` 12 次真实调用跑通，**全程只读** |
-| 渠道计价与对比 | ✅ 真实 | `decider.py` 纯标准库实现，173 项自测覆盖各决策分支 |
+| 渠道计价与对比 | ✅ 真实 | `decider.py` 纯标准库实现，253 项自测覆盖各决策分支 |
 | 页面与 CLI 一致 | ✅ 真实 | `parity_check.py` 逐场景对拍两端（56 项比对），防止两份实现漂移 |
 | 真实数据回归 | ✅ **真实实测** | 24 项断言锁定真实接口契约，见 `sample_data/real_snapshot.json` |
 | **两次独立采集交叉验证** | ✅ **真实实测** | 10-22 脚本采集 vs 10-23 原生通道采集，到店核价返回字段集完全一致 |
@@ -435,7 +435,7 @@ python real_run.py             # 用【你自己的】账号跑真实链路
     ├── scripts/
     │   ├── mcp_client.py        # 纯标准库 MCP 客户端（握手/工具/调用/合规护栏）
     │   ├── decider.py           # 决策引擎：计价、对比、券体检、单位归一化
-    │   ├── selftest.py          # 173 项自测
+    │   ├── selftest.py          # 253 项自测
     │   ├── parity_check.py|.mjs # 前后端对拍（页面 vs CLI）
     │   ├── setup_token.py       # 交互式配置 Token（不回显）
     │   ├── setup_mcp.ps1        # Windows 一键写入连接器配置
@@ -454,7 +454,7 @@ python real_run.py             # 用【你自己的】账号跑真实链路
 - **券的场景建模** —— 建模 `channel` 字段，解决「券用不了」这个真实痛点。
 - **保守计价** —— 不叠加券、不猜价格，宁可少报优惠也不给假低价。
 - **诚实降级** —— 起送价未达标、距离不可得、字段缺失，都有明确的降级说明。
-- **173 项自测** —— 覆盖券可用性、选券策略、计价、决策分支、字段归一化、金额单位契约、合规护栏、**静态页无外发**八类。
+- **253 项自测** —— 覆盖券可用性、选券策略、计价、决策分支、字段归一化、金额单位契约、合规护栏、**静态页无外发**八类。
 - **前后端对拍** —— 在线试算页与 CLI 是同一套逻辑，逐场景比对 56 项，防止漂移。
 
 ---
