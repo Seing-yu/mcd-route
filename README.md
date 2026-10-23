@@ -75,68 +75,33 @@ git clone <本仓库> && cp -r skills/mcd-route ~/.workbuddy/skills/
 
 ### 2. 配置 MCP Token
 
-Token 申请地址：<https://open.mcd.cn/mcp>（手机号登录 → 右上角「控制台」→「激活」）。
-
-**推荐：交互式写入本地凭据文件（Token 不经过对话、不进入仓库）**
-
-```bash
-cd skills/mcd-route/scripts
-python setup_token.py
-```
-
-脚本会提示你粘贴 Token（**输入不回显**），写入 `~/.workbuddy/.mcd_token`
-（用户主目录，不在任何 git 仓库内，权限 600）。
-
-也可以直接设置环境变量：
-
-```bash
-export MCD_MCP_TOKEN=你的token   # macOS / Linux
-set MCD_MCP_TOKEN=你的token      # Windows
-```
-
-**在 WorkBuddy 里使用**：左侧边栏【专家·技能·连接器】→【连接器】→
-右上角【自定义连接器】→【配置 MCP】，填入
-[`mcp-config.example.json`](mcp-config.example.json) 的内容，
-把 `${MCD_MCP_TOKEN}` 替换为你的真实 Token，保存 → 点【信任】→ 开启开关。
-
 **Windows 一键配置（推荐，Token 不经过对话）**：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\skills\mcd-route\scripts\setup_mcp.ps1
 ```
 
-脚本会从 `~/.workbuddy/.mcd_token` 读 Token → 备份原 `mcp.json` →
+脚本从 `~/.workbuddy/.mcd_token` 读 Token → 备份原 `mcp.json` →
 写出新配置 → 校验 JSON 与编码，全程**不回显 Token**。
 
-> 🪟 **两个 Windows 编码坑（脚本已规避，但你手写配置时会踩）**
+**手动配置**：左侧边栏【专家·技能·连接器】→【连接器】→
+右上角【自定义连接器】→【配置 MCP】，填入
+[`mcp-config.example.json`](mcp-config.example.json) 的内容，
+把 `${MCD_MCP_TOKEN}` 替换为**真实 Token 字面值**，保存 → 点【信任】→ 开启开关 → 重启 WorkBuddy。
+
+> ⚠️ **两个会让连接器加载不出来的坑**
 >
 > | 坑 | 后果 | 对策 |
 > |---|---|---|
-> | `Set-Content -Encoding UTF8` 写入 **BOM** | WorkBuddy 严格 JSON 解析，报 `Unexpected UTF-8 BOM`，连接器加载不出来 | 用 `UTF8Encoding($false)` 写；或直接用 `setup_mcp.ps1` |
-> | `.ps1` 存成**无 BOM** UTF-8 | PowerShell 5.1 按 ANSI 解码，脚本里的中文注释乱码 | `.ps1` 存成 **UTF-8 with BOM**（仓库里这份已带 BOM） |
+> | 桌面端**不展开** `${MCD_MCP_TOKEN}` 占位符 | 会把 `Bearer ${MCD_MCP_TOKEN}` 原样发给服务器，**必然 401** | 配置里必须写真实 Token 字面值（占位符只对本 Skill 的脚本有效） |
+> | `type` 写成 `streamablehttp` | 官方 README 给的是这个值，但桌面端源码只认 `stdio`/`sse`/`http` | 本仓库统一用 `http`，**连不上就改成 `http` 试试** |
+> | PowerShell 写 JSON 带 UTF-8 BOM | 严格 JSON 解析报 `Unexpected UTF-8 BOM` | 用 `setup_mcp.ps1`（已规避），手写时用 `UTF8Encoding($false)` |
 >
-> 这两条都在 `scripts/selftest.py` 里有对应断言，回归时自动检查。
+> 这三条在 `scripts/selftest.py` 里都有对应断言，回归时自动检查。
 
-> ⚠️ **WorkBuddy 桌面端不会展开 `${MCD_MCP_TOKEN}` 这类环境变量占位符。**
-> 它只会把字符串原样塞进请求头（实测：占位符会变成
-> `Bearer ${MCD_MCP_TOKEN}` 发给服务器，必然 401）。
-> 所以桌面端配置里必须写**真实 Token 字面值**。
-> 环境变量占位符只对**本 Skill 自带的脚本**有效
-> （`mcp_client.py` 自己解析 `MCD_MCP_TOKEN` 与 `~/.workbuddy/.mcd_token`），
-> 仓库里的 `mcp-config.example.json` 保留占位符是为了**不泄露真实 Token**，
-> 供他人复制时替换用。
->
-> ⚠️ **另有一处与官方 README 不同：`type` 字段用 `http` 而非 `streamablehttp`。**
-> 官方文档给的是 `"type": "streamablehttp"`，但读 WorkBuddy 桌面端源码
-> （`toUserServerForm`）确认，它只接受 `stdio` / `sse` / `http` 三个值。
-> 写 `streamablehttp` 时 `toTransport` 会把它归到 `http` 分支（恰好能连），
-> 但 UI 回写配置时会改写成 `http`，属于不一致状态。
-> 本仓库统一用 `http` —— 实测握手成功（协议 2025-06-18，35 个 Tool 全在线）。
-> **用官方那份配置连不上时，把 `streamablehttp` 改成 `http` 试试。**
->
-> **为什么推荐用凭据文件而不是把 Token 贴进对话**：
-> MCP Token 与你的麦当劳会员账号强绑定，等同于账号操作权限。
-> 对话内容会经过第三方模型服务商处理，凭据文件则完全在你的机器上。
+**为什么用凭据文件而不是把 Token 贴进对话**：
+MCP Token 与你的麦当劳会员账号强绑定，等同于账号操作权限；
+对话内容会经过第三方模型服务商处理，凭据文件则完全在你的机器上。
 > `scripts/selftest.py` 里有一项断言会**扫描整个仓库**，
 > 确认不存在任何真实 Token 形态的字符串。
 >
@@ -228,17 +193,13 @@ python skills/mcd-route/scripts/decider.py \
 渠道官：查起送价 → 「外送起送价 20 元，**这单达不到**。到店自取，12 元。」
 （诚实降级，不硬凑一个外送方案）
 
-**示例 4 · 我不在乎时间**
-> 用户：钱一样的话哪个快？
+**示例 4 · 结论随你的时间观改变**
+> 用户：钱一样的话哪个快？我一小时时薪 100 元，外送真划算吗？
 
-渠道官：`--minute-cost 0` → 「到手价一样，外送等 25 分钟，到店往返 28 分钟。
-按你不在乎时间算，**外送**更省事。」
-
-**示例 5 · 我时间很贵
-> 用户：我一小时的时薪 100 元，外送真划算吗？
-
-渠道官：`--minute-cost 1.67` → 时间成本被放大，
-「外送多花 25 分钟 ≈ 41.7 元，已经超过 15 元的价差，**真该自己去**。」
+渠道官：同一个购物篮，`--minute-cost 0` → 「到手价一样，外送等 25 分钟，
+到店往返 28 分钟，**外送**更省事」；
+`--minute-cost 1.67` → 「外送多花 25 分钟 ≈ 41.7 元，已超过 15 元的价差，
+**真该自己去**。」
 
 ---
 
@@ -278,31 +239,18 @@ python skills/mcd-route/scripts/decider.py \
 
 ## 命令行快速体验（无需 Token）
 
-内置样例数据，可离线跑通完整决策流程：
-
 ```bash
 cd skills/mcd-route/scripts
 
-# 看决策结果
-python decider.py --pretty
+python decider.py --pretty                    # 看决策结果（内置样例数据）
+python decider.py --minute-cost 1.67          # 调时间单价（0=不在乎时间）
+python selftest.py                             # 跑 173 项自测
+python parity_check.py                         # 对拍：页面与 CLI 是否一致（需 Node）
 
-# 调整时间单价（0 = 不在乎时间；1.67 ≈ 时薪100元）
-python decider.py --minute-cost 0
-python decider.py --minute-cost 1.67
-
-# 跑 173 项自测（改逻辑后必跑）
-python selftest.py
-
-# 前后端对拍：验证在线试算页与 CLI 结果一致（需 Node）
-python parity_check.py
-
-# 真实 MCP 连通自检（需 Token，证明数据链路是真的）
-python setup_token.py      # 交互式配置 Token（不回显）
-python mcp_probe.py
-
-# 端到端真实走查（12 次真实调用，全程只读，不下单不领券）
-python real_run.py
-python real_run.py --city 北京 --keyword 望京
+# 需 Token 的真实链路自检
+python setup_token.py                          # 交互式配置 Token（不回显）
+python mcp_probe.py                            # 四层连通性自检
+python real_run.py                             # 端到端真实走查（12 次调用，全程只读）
 ```
 
 **真实走查输出节选**（2026-10-22 实测）：
@@ -341,25 +289,24 @@ python real_run.py --city 北京 --keyword 望京
 
 ---
 
-## 🔐 任何人都能用你自己的 Token 跑
+## 🔐 你的 Token 与个人信息安全
 
-**这个问题评审一定会问，所以做成了可验证的事实。**
+> 评审一定会问：**「我把 Token 放进去，会不会被人爬走？」**
+> 这个问题不用你信我的说法 —— 下面每一条都是可复现的验证。
 
-开发者联调时用的是自己的 MCP Token，但那**只存在于开发者的机器上**：
+### 你的 Token 不会随仓库泄露
 
-```
-C:\Users\<你>\.workbuddy\.mcd_token      ← 你的机器，不在仓库里
-```
-
-仓库里**没有任何真实凭据**。脚本按优先级读取：
-
-| 优先级 | 来源 | 适用场景 |
+| 防护层 | 做法 | 验证方式 |
 |---|---|---|
-| 1 | 显式传参 `McpClient(token=...)` | 一次性调试 |
-| 2 | 环境变量 `MCD_MCP_TOKEN` | CI、临时使用 |
-| 3 | 本地凭据文件 `~/.workbuddy/.mcd_token` | 本机日常使用 |
+| 仓库内 | 只有 `Bearer ${MCD_MCP_TOKEN}` 占位符 | 自测断言扫全仓库 |
+| **git 全历史** | 每个提交逐个 diff 扫描 | `git log --all -p` 全量 grep，**0 处真实 Token** |
+| 本地存放 | `~/.workbuddy/.mcd_token`（不在任何 git 仓库内） | 路径断言 |
+| 桌面端配置 | `~/.workbuddy/mcp.json`（明文，但在仓库外） | 路径断言 |
+| 写入方式 | `setup_token.py` / `setup_mcp.ps1` 交互式写入 | `getpass` 不回显，**Token 不经过对话** |
 
-**你 clone 之后，只需配自己的 Token：**
+脚本按优先级读取：`显式传参` > `环境变量 MCD_MCP_TOKEN` > `~/.workbuddy/.mcd_token`。
+
+**clone 之后配你自己的 Token**（这也是「任何人都能用自己的 Token 跑」的含义）：
 
 ```bash
 git clone https://github.com/Seing-yu/mcd-route.git
@@ -367,103 +314,36 @@ cd mcd-route/skills/mcd-route/scripts
 
 # 到 https://open.mcd.cn/mcp 手机号登录 → 控制台 → 激活，拿到你自己的 Token
 python setup_token.py          # 交互式输入，不回显，写入 ~/.workbuddy/.mcd_token
-
-python real_run.py              # 用【你自己的】账号跑真实链路
+python real_run.py             # 用【你自己的】账号跑真实链路
 ```
 
-### 这件事是被验证过的，不是承诺
+### 这个项目没有服务器，也没有数据出口
 
-| 验证项 | 结果 |
-|---|---|
-| 全仓库扫描真实 Token | ✅ 0 处命中 |
-| git 全部历史扫描 | ✅ 0 处命中 |
-| 配置示例内容 | ✅ 仅 `Bearer ${MCD_MCP_TOKEN}` |
-| 无 Token 时运行 | ✅ 返回空并提示申请，**不报错、不回退** |
-| 换 Token 后运行 | ✅ 请求头换成你自己的 |
-| 个人信息扫描 | ✅ 无手机号 / 身份证 / 邮箱（官方规则快照除外） |
-| **固化为自测断言** | ✅ **8 项，随 CI 自动检查** |
-
-> 也就是说：**「不含开发者凭据」这件事由 CI 守着**，将来任何人误提交真 Token，CI 会立刻失败。
-
-### 隐私处理
-
-| 数据 | 处理 |
-|---|---|
-| Token | 只在你的机器上，仓库内仅占位符 |
-| 配送地址、电话 | 真实快照中已替换为「示例门店 A/B」 |
-| 门店位置 | 真实快照已中性化；**但 `real_run.py` 与 `SKILL.md` 保留「望京」作为接口调用示例**——麦当劳北京望京店是公开门店，任何人都能照着跑通 |
-
-> 保留示例位置是有意的：它是**可复现的调用示例**，不是隐私。
-
----
-
-## 🔐 你的凭据与个人信息安全
-
-> 这一节回答一个评审一定会问、也一定会被人担心的问题：
-> **「把我的 Token 放进去，会不会被人爬走？」**
-
-### 一、Token 会不会随仓库泄露？—— 不会，且是机器验证过的
-
-| 防护层 | 具体做法 | 验证方式 |
-|---|---|---|
-| 仓库内 | 只有 `Bearer ${MCD_MCP_TOKEN}` 占位符 | 自测断言扫描全仓库 |
-| **git 全历史** | 12 个提交逐个 diff 扫描，0 处真实 Token | `git log --all -p` 全量 grep |
-| 本地存放 | `~/.workbuddy/.mcd_token`（不在任何 git 仓库内） | 路径断言 |
-| 桌面端配置 | `~/.workbuddy/mcp.json`（明文，但在仓库外） | 路径断言 |
-| 推送到 GitHub 前 | `setup_token.py` 交互式写入，**Token 不经过对话、不经过剪贴板** | `getpass` 不回显 |
-
-**实测结论**（2026-10-23 复扫）：git 全部历史中所有 `Bearer` 命中项均为
-代码模板或占位符，**零真实 Token**。
-
-### 二、那"别人用我的项目"会不会把我的信息传出去？—— 不会
-
-这是最容易误解的一点，展开说：
-
-**本项目没有服务端、没有数据库、没有上传接口。**
-它不是一个"网站"，是一堆**跑在你自己机器上的文件**。
+它不是"网站"，是一堆**跑在你自己机器上的文件**。
+**无服务端、无数据库、无上传接口**（全仓库无 `flask`/`fastapi`/`express`/db 命中）。
 
 | 环节 | 数据流向 | 谁能拿到 |
 |---|---|---|
 | Token | `~/.workbuddy/` → `mcp.mcd.cn` 请求头 | 只有麦当劳服务器 |
 | 你的地址 | 你**主动**给 → `mcp.mcd.cn` | 只有麦当劳服务器 |
 | 门店/菜单/价格 | `mcp.mcd.cn` → 本地内存 | 无人 |
-| 试算页 | **全部计算在浏览器本地**，不发任何请求 | 无人 |
-| 样例数据 | 硬编码在仓库里，公开可读 | 所有人（本来就不是隐私） |
+| 试算页 | **全部计算在浏览器本地**，零 `fetch`、零外部 `<script>` | 无人 |
+| 样例数据 | 硬编码在仓库里 | 所有人（本来就不是隐私） |
 
-**试算页 `docs/index.html` 的实测**：零 `fetch`、零 `XMLHttpRequest`、
-零外部 `<script src>`。你拖动的每个参数只存在于浏览器内存，刷新即消失。
+**结构上不存在「接收别人凭据」的接口**：唯一涉及 Token 的入口是本地终端脚本（不经过浏览器）；
+`delivery-query-addresses` 是**麦当劳官方 MCP 的 Tool**，本项目只调用、不实现，地址也不落盘。
+别人 fork 你的仓库，他的 Token 存进**他自己的** `~/.workbuddy/`，与你的完全隔离。
 
-**规则快照 `docs/mcp-rules-20251203.html`**：原页面是 JS 渲染的，
-直接存档会把官方页面的第三方脚本（微信 / 支付宝 / 腾讯地图定位 / 麦当劳 CDN）
-一并带进来——访客打开时会向 4 个第三方发起请求，且内含官方的地图 API key。
-**本仓库已改为纯文本离线存档**：只保留规则正文，
-实测 `0` 个外部脚本、唯一外链是 `open.mcd.cn/mcp` 原文地址。
+### 配送地址：不会主动向你索取
 
-### 三、有没有"接收别人 Token / 地址"的接口？—— 结构上不存在
+查外送需要 `addressId`（属个人数据）。拿不到时，Skill 只做到店侧，
+并在结论里明说"外送侧未采集，原因是什么"，**不会用猜测值凑一个方案**。
 
-| 提问 | 事实 |
-|---|---|
-| 有没有让用户填 Token 的网页表单？ | **没有**。唯一涉及 Token 的入口是本地终端脚本（`setup_token.py` / `setup_mcp.ps1`），写入本地文件，不经过浏览器 |
-| 有没有收集地址的接口？ | **没有**。`delivery-query-addresses` 是**麦当劳官方 MCP 的 Tool**，本项目只调用它、不实现它，也不把地址落盘 |
-| 有没有后端？ | **没有**。全仓库无 `flask` / `fastapi` / `express` / 数据库 / 上传逻辑 |
-| 别人 fork 了这个仓库，他的 Token 会传到哪？ | **他自己的** `~/.workbuddy/`，和你的完全隔离。仓库里没有我的服务端可以收集 |
+官方规则第五条要求「请勿在与 AI 的对话中输入 MCP Token」——
+本项目从设计上遵守：Token 走本地文件，**不进入对话、不经过第三方模型服务商**。
 
-### 四、你的个人信息会不会被我（AI）读到？
-
-官方规则第五条要求：**请勿在与 AI 的对话中输入 MCP Token**。
-
-本项目从设计上遵守：Token 通过本地脚本写入凭据文件，
-**不进入对话、不经过第三方模型服务商**。
-`selftest.py` 会扫描全仓库确认没有真实 Token 形态的字符串。
-
-至于**配送地址**——它属于你的个人数据。
-Skill **不会主动索取**：查外送需要 `addressId`，
-拿不到时它只做到店侧，并在结论里明说"外送侧未采集，原因是什么"，
-不会用猜测值凑一个方案。
-
-> **一句话总结**：这个项目没有中心，没有服务器，没有数据出口。
-> 你的 Token 从你的机器直接到麦当劳服务器，中间不经过任何人 ——
-> 包括我。
+> **一句话总结**：没有中心，没有服务器，没有数据出口。
+> 你的 Token 从你的机器直接到麦当劳服务器，中间不经过任何人 —— 包括我。
 
 ---
 
@@ -541,33 +421,27 @@ Skill **不会主动索取**：查外送需要 `addressId`，
 
 ```
 .
-├── README.md                      # 本文件
-├── CONTEST_DECLARATION.md         # 参赛声明（官方原文，未改动）
-├── MCP_INTEGRATION.md             # MCP 集成说明：Tool 清单 / 调用流程 / 业务价值 / 规则对照
-├── mcp-config.example.json        # 脱敏 MCP 配置（仅环境变量占位符）
-├── workbuddy.md                   # WorkBuddy 开发对话上下文
-├── LICENSE                        # MIT
+├── README.md                    # 本文件
+├── CONTEST_DECLARATION.md       # 参赛声明（官方原文，未改动）
+├── MCP_INTEGRATION.md           # Tool 清单 / 调用流程 / 业务价值 / 规则对照
+├── mcp-config.example.json      # 脱敏 MCP 配置（仅环境变量占位符）
+├── workbuddy.md                 # WorkBuddy 开发对话上下文
 ├── docs/
-│   ├── index.html                 # ← 在线试算页（单文件，零外部依赖）
-│   ├── 推广物料.md                 # 冲 Star 用：长文骨架 / 短文案 / 话术 / 节奏表
-│   └── mcp-rules-20251203.html    # 官方 MCP 服务规则原文快照
-└── skills/mcd-route/              # ← Skill 本体
-    ├── SKILL.md                   # 技能指令（Agent 加载）
+│   ├── index.html               # ← 在线试算页（单文件，零外部依赖）
+│   ├── 推广物料.md               # 冲 Star 用素材
+│   └── mcp-rules-20251203.html  # 官方 MCP 服务规则存档（纯文本离线版）
+└── skills/mcd-route/            # ← Skill 本体
+    ├── SKILL.md                 # 技能指令（Agent 加载）
     ├── scripts/
-    │   ├── mcp_client.py          # 纯标准库 MCP 客户端（握手/工具列表/调用/合规护栏）
-    │   ├── decider.py             # 决策引擎：渠道计价、对比、券体检、单位归一化
-    │   ├── selftest.py            # 173 项自测
-    │   ├── parity_check.py        # 前后端对拍（页面 vs CLI）
-    │   ├── parity_check.mjs       # 前端计算引擎抽取器
-    │   ├── setup_token.py         # 交互式配置 Token（不回显，不进对话）
-    │   ├── setup_mcp.ps1          # Windows 一键写入 WorkBuddy 连接器配置（无 BOM）
-    │   ├── mcp_probe.py           # MCP 连通性自检（四层）
-    │   └── sample_data/
-    │       ├── scenario.json      # 离线样例，无需 Token 即可跑通
-    │       ├── real_snapshot.json # 10-22 脚本采集的真实接口契约快照
-    │       └── live_20261023.json # 10-23 WorkBuddy 原生 MCP 通道实采快照
-    └── references/
-        └── mcp-tools.md           # Tool 清单、字段映射、金额单位契约、实测记录
+    │   ├── mcp_client.py        # 纯标准库 MCP 客户端（握手/工具/调用/合规护栏）
+    │   ├── decider.py           # 决策引擎：计价、对比、券体检、单位归一化
+    │   ├── selftest.py          # 173 项自测
+    │   ├── parity_check.py|.mjs # 前后端对拍（页面 vs CLI）
+    │   ├── setup_token.py       # 交互式配置 Token（不回显）
+    │   ├── setup_mcp.ps1        # Windows 一键写入连接器配置
+    │   ├── mcp_probe.py         # 连通性自检（四层）
+    │   └── sample_data/         # 样例 + 两份真实接口快照
+    └── references/mcp-tools.md  # Tool 清单、字段映射、金额单位契约
 ```
 
 ---
