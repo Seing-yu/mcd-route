@@ -9,14 +9,14 @@
       "query-nearby-stores(city=北京, keyword=望京, beType=1, searchType=2) -> 5 家门店",
       "query-meals(storeCode=1950980, orderType=1, beType=1) -> 17 个分类 118 款",
       "query-store-coupons(storeCode=1950980, orderType=1, beType=1) -> 2 张券",
-      "calculate-price(storeCode=1950980, orderType=1, beType=1) -> price=3350（分）"
+      "calculate-price(storeCode=1950980, orderType=1, beType=1) -> price=4650（分）"
     ],
     "calculate_price_raw_fen": {
-      "productOriginalPrice": 3350,
-      "productPrice": 3350,
-      "originalPrice": 3350,
+      "productOriginalPrice": 4650,
+      "productPrice": 4650,
+      "originalPrice": 4650,
       "discount": 0,
-      "price": 3350,
+      "price": 4650,
       "packingPrice": null,
       "deliveryPrice": null
     },

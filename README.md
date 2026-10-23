@@ -143,10 +143,10 @@ cp -r skills/mcd-route ~/.workbuddy/skills/
 
 | Tool | 实参 | 返回 |
 |---|---|---|
-| `query-nearby-stores` | `city=北京, keyword=望京, beType=1` | 5 家门店，含 distance（米） |
-| `query-meals` | `storeCode=1950980, orderType=1, beType=1` | 11 分类 118 款餐品 |
-| `query-store-coupons` | `storeCode=1950980` | `data:[]`（该门店到店渠道无券） |
-| `calculate-price` | 3 件商品 | `price=4350`（分）= ¥43.50 |
+| `query-nearby-stores` | `city=北京, keyword=望京, beType=1` | 5 家门店，distance 312~1215 米 |
+| `query-meals` | `storeCode=1950980, orderType=1, beType=1` | 17 分类 118 款餐品 |
+| `query-store-coupons` | `storeCode=1950980` | 2 张券，绑商品 1440 / 9900016534 |
+| `calculate-price` | 麦辣鸡腿汉堡+薯条+可乐 | `price=4650`（分）= ¥46.50 |
 
 ### 方式 B · 命令行跑决策（无需 Token也能跑通）
 

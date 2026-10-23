@@ -305,26 +305,34 @@ if os.path.exists(_live_path):
 
 if _live:
     _prov = _live["_provenance"]
+    _cpf = _prov["calculate_price_raw_fen"]
     check("原生通道快照:标注走 mcp__mcd-mcp__* 通道",
           "mcp__mcd-mcp__" in _prov["channel"], _prov["channel"])
-    check("原生通道快照:字段名与 10-22 脚本采集一致",
-          _prov["calculate_price_raw_fen"]["productOriginalPrice"] == 3350
-          and "price" in _prov["calculate_price_raw_fen"])
+    # 断言不写死具体数值：只要结构对、单位对（元 = 分/100）即可。
+    # 写死数值会导致「更新实采数据」时断言与数据不同步而误报。
+    check("原生通道快照:核价字段齐全且单位为分",
+          all(k in _cpf for k in
+              ("productOriginalPrice", "productPrice", "originalPrice",
+               "discount", "price"))
+          and _cpf["price"] > 0
+          and _cpf["price"] == _cpf["originalPrice"] - _cpf["discount"],
+          str(_cpf.get("price")))
 
     # 两次独立采集的到店核价返回，字段结构必须完全对齐
-    _live_cp = dict(_prov["calculate_price_raw_fen"])
+    _live_cp = dict(_cpf)
     _live_cp.pop("packingPrice", None)
     _live_cp.pop("deliveryPrice", None)
-    _old_cp = dict(_real_contract_cp := {
+    _old_cp = {
         "productOriginalPrice": 3350, "productPrice": 3350,
         "originalPrice": 3350, "discount": 0, "price": 3350,
-    })
+    }
     check("原生通道 vs 脚本采集:到店核价字段集一致",
           set(_live_cp.keys()) == set(_old_cp.keys()),
           f"{sorted(_live_cp)} vs {sorted(_old_cp)}")
 
-    _live_parsed = parse_calculate_price(_prov["calculate_price_raw_fen"])
-    check("原生通道快照:分转元正确", approx(_live_parsed["total"], 33.5),
+    _live_parsed = parse_calculate_price(_cpf)
+    check("原生通道快照:分转元正确",
+          approx(_live_parsed["total"], _cpf["price"] / 100.0),
           str(_live_parsed["total"]))
     check("原生通道快照:到店无配送费", approx(_live_parsed["delivery_fee"], 0.0))
     check("原生通道快照:到店无打包费", approx(_live_parsed["packing_fee"], 0.0))
