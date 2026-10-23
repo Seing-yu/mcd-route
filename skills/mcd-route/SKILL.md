@@ -174,7 +174,7 @@ python scripts/decider.py --scenario <scenario.json> --minute-cost 0.5
 ```
 scripts/mcp_client.py   纯标准库 MCP 客户端（握手 / tools/list / tools/call）
 scripts/decider.py      决策引擎：渠道计价、对比、券体检
-scripts/selftest.py     151 项自测，改逻辑后必跑
+scripts/selftest.py     173 项自测，改逻辑后必跑
 scripts/mcp_probe.py    连通性自检：证明数据链路是真的
 scripts/setup_token.py  交互式写入本地凭据文件（不回显）
 scripts/setup_mcp.ps1   Windows：把凭据写进 WorkBuddy 连接器配置（无 BOM）

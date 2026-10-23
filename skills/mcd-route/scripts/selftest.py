@@ -591,12 +591,14 @@ _PII_PATTERNS = [
     ("邮箱", re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")),
 ]
 _pii_hits = []
+_repo_files = []
 for _dirpath, _dirnames, _filenames in os.walk(_repo_root):
     if ".git" in _dirpath or "__pycache__" in _dirpath:
         continue
     for _fn in _filenames:
         if _fn in _SKIP_SCAN:
             continue  # 官方原文快照，不属于开发者隐私
+        _repo_files.append(os.path.relpath(os.path.join(_dirpath, _fn), _repo_root))
         _p = os.path.join(_dirpath, _fn)
         try:
             with open(_p, encoding="utf-8", errors="ignore") as fh:
@@ -636,6 +638,23 @@ for _page in ("docs/index.html", "docs/mcp-rules-20251203.html"):
     _map_keys = re.findall(r"key\s*=\s*[A-Za-z0-9\-]{20,}", _ptxt)
     check(f"{_page} 不含第三方 API key", not _map_keys,
           "; ".join(_map_keys[:2]))
+
+# --- 仓库不得含任何长数字标识符 ---
+# 麦当劳 MCP 的 addressId 是 28 位左右的数字串（用户个人配送地址标识），
+# 券码、门店编码是 7~10 位。长数字串几乎必然是个人数据标识，
+# 必须脱敏后才能进仓库 —— 2026-10-23 推送前扫描就抓到过一处漏网的。
+for _f in _repo_files:
+    if not _f.endswith((".json", ".py", ".md", ".mjs", ".html", ".yml", ".yaml", ".ps1")):
+        continue
+    _fp = os.path.join(_repo_root, _f)
+    try:
+        with open(_fp, encoding="utf-8", errors="ignore") as fh:
+            _ftxt = fh.read()
+    except OSError:
+        continue
+    _long_ids = re.findall(r"\b\d{15,}\b", _ftxt)
+    check(f"{_f} 无长数字标识符（地址ID等）", not _long_ids,
+          "; ".join(_long_ids[:3]))
 
 # 规则存档必须保留完整八条
 _rules_path = os.path.join(_repo_root, "docs", "mcp-rules-20251203.html")
