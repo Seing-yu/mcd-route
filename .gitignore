@@ -20,3 +20,6 @@ Thumbs.db
 
 # WorkBuddy 本地记忆目录（不属于参赛作品）
 .workbuddy/
+
+# git 历史改写工具的临时目录
+.git-rewrite/
