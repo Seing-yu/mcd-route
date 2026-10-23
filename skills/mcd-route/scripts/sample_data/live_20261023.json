@@ -1,0 +1,57 @@
+{
+  "_comment": "真实场景快照 2026-10-23，通过 WorkBuddy 原生 MCP 通道（mcp__mcd-mcp__*）实采。门店：麦当劳北京望京街餐厅 storeCode=1950980，坐标锚点=望京。外送侧因无配送地址未采集，故本次仅到店侧为实测数据，外送侧留空并显式标注。",
+  "_provenance": {
+    "channel": "WorkBuddy 原生 MCP 通道 mcp__mcd-mcp__*",
+    "date": "2026-10-23",
+    "tools_used": [
+      "query-nearby-stores(storeCode=1950980)",
+      "query-meals(storeCode=1950980, orderType=1, beType=1)",
+      "query-store-coupons(storeCode=1950980, orderType=1, beType=1) -> data 为空数组",
+      "query-store-coupons(storeCode=1950980, orderType=1, beType=1) -> data 为空数组",
+      "calculate-price(storeCode=1950980, orderType=1, beType=1)"
+    ],
+    "calculate_price_raw_fen": {
+      "productOriginalPrice": 4350,
+      "productPrice": 4350,
+      "originalPrice": 4350,
+      "discount": 0,
+      "price": 4350,
+      "packingPrice": null,
+      "deliveryPrice": null
+    }
+  },
+  "basket": [
+    { "code": "9900003458", "name": "猪柳蛋麦满分套餐", "price": 26.0, "qty": 1 },
+    { "code": "4825", "name": "脆薯饼", "price": 8.0, "qty": 1 },
+    { "code": "9900008751", "name": "可乐", "price": 9.5, "qty": 1 }
+  ],
+  "delivery": {
+    "stores": [],
+    "fee": 0.0,
+    "min_order": 0.0,
+    "prep_minutes": 0,
+    "coupons": [],
+    "notes": [
+      "本次未采集外送侧数据：delivery-query-stores 需要 delivery-query-address 返回的 addressId，而 addressId 属于用户个人地址，需用户主动提供",
+      "不猜不估，外送侧留空。补采后本文件可复现完整对比"
+    ]
+  },
+  "pickup": {
+    "stores": [
+      {
+        "storeCode": "1950980",
+        "storeName": "麦当劳麦当劳北京望京街餐厅",
+        "address": "朝阳门望京西园四区402号楼1层101号商铺",
+        "distance": 312
+      }
+    ],
+    "prep_minutes": 8,
+    "travel_minutes": 0,
+    "coupons": [],
+    "notes": [
+      "query-store-coupons 返回 data:[]，即该会员在该门店到店渠道下无券可用",
+      "已换店交叉验证（storeCode=1950980 新华东街餐厅）同样为空，排除单店异常",
+      "券为空属真实业务状态，不做兜底估算"
+    ]
+  }
+}

@@ -29,6 +29,7 @@ from decider import (  # noqa: E402
     fen_to_yuan,
     money,
     parse_calculate_price,
+    run_scenario,
     to_yuan,
 )
 from mcp_client import (  # noqa: E402
@@ -291,6 +292,58 @@ check("默认 URL 正确", client.url == "https://mcp.mcd.cn", client.url)
 # ---------------------------------------------------------------- 真实数据回归
 # 以下断言全部基于 2026-10-22 真实 MCP 调用的返回（见 sample_data/real_snapshot.json）。
 # 目的：把「真实接口契约」锁死，防止后续改动破坏与真实数据的一致性。
+
+# --- 0. 原生 MCP 通道实采快照（2026-10-23）---
+# 这批数据是通过 WorkBuddy 原生 MCP 通道（mcp__mcd-mcp__*）实采的，
+# 与 10-22 通过脚本采集的 real_snapshot.json 互为交叉验证。
+_live_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          "sample_data", "live_20261023.json")
+_live = None
+if os.path.exists(_live_path):
+    with open(_live_path, encoding="utf-8") as fh:
+        _live = json.load(fh)
+
+if _live:
+    _prov = _live["_provenance"]
+    check("原生通道快照:标注走 mcp__mcd-mcp__* 通道",
+          "mcp__mcd-mcp__" in _prov["channel"], _prov["channel"])
+    check("原生通道快照:字段名与 10-22 脚本采集一致",
+          _prov["calculate_price_raw_fen"]["productOriginalPrice"] == 4350
+          and "price" in _prov["calculate_price_raw_fen"])
+
+    # 两次独立采集的到店核价返回，字段结构必须完全对齐
+    _live_cp = dict(_prov["calculate_price_raw_fen"])
+    _live_cp.pop("packingPrice", None)
+    _live_cp.pop("deliveryPrice", None)
+    _old_cp = dict(_real_contract_cp := {
+        "productOriginalPrice": 3350, "productPrice": 3350,
+        "originalPrice": 3350, "discount": 0, "price": 3350,
+    })
+    check("原生通道 vs 脚本采集:到店核价字段集一致",
+          set(_live_cp.keys()) == set(_old_cp.keys()),
+          f"{sorted(_live_cp)} vs {sorted(_old_cp)}")
+
+    _live_parsed = parse_calculate_price(_prov["calculate_price_raw_fen"])
+    check("原生通道快照:分转元正确", approx(_live_parsed["total"], 43.5),
+          str(_live_parsed["total"]))
+    check("原生通道快照:到店无配送费", approx(_live_parsed["delivery_fee"], 0.0))
+    check("原生通道快照:到店无打包费", approx(_live_parsed["packing_fee"], 0.0))
+    check("原生通道快照:缺失字段落入 notes（不猜不估）",
+          any("打包费" in n for n in _live_parsed["notes"]),
+          "; ".join(_live_parsed["notes"]))
+
+    # 真实场景能跑通完整决策，且外送缺数据时诚实降级
+    _live_result = run_scenario(_live, minute_cost=0.5)
+    check("原生通道快照:能跑出决策结论",
+          bool(_live_result["verdict"]["recommended"]),
+          _live_result["verdict"]["recommended"])
+    check("原生通道快照:外送缺数据时标为不可用",
+          _live_result["verdict"]["detail"]["delivery"]["available"] is False)
+    check("原生通道快照:缺数据原因写进 notes",
+          any("addressId" in n
+              for n in _live_result["verdict"]["detail"]["delivery"]["notes"]))
+else:
+    check("原生通道快照存在", False, _live_path)
 
 _real = None
 _real_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),

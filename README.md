@@ -5,7 +5,7 @@
 >
 > 麦当劳程序员创意开发大赛参赛作品 · 非麦当劳官方产品。
 
-![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![自测](https://img.shields.io/badge/selftest-119%20passed-success) ![License](https://img.shields.io/badge/license-MIT-green)
+![Python](https://img.shields.io/badge/python-3.8%2B-blue) ![零依赖](https://img.shields.io/badge/dependencies-0-brightgreen) ![自测](https://img.shields.io/badge/selftest-137%20passed-success) ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
@@ -231,7 +231,7 @@ python decider.py --pretty
 python decider.py --minute-cost 0
 python decider.py --minute-cost 1.67
 
-# 跑 119 项自测（改逻辑后必跑）
+# 跑 137 项自测（改逻辑后必跑）
 python selftest.py
 
 # 前后端对拍：验证在线试算页与 CLI 结果一致（需 Node）
@@ -266,10 +266,12 @@ python real_run.py --city 北京 --keyword 望京
 | 项目 | 性质 | 说明 |
 |---|---|---|
 | MCP 客户端握手 | ✅ **真实实测** | 协议 2025-06-18，服务器 `mcd-mcp` v1.0.0，35 个 Tool |
+| **WorkBuddy 原生 MCP 通道** | ✅ **真实实测** | 通过连接器 `mcd-mcp`（`mcp__mcd-mcp__*`）实调 4 个 Tool 成功，见 `sample_data/live_20261023.json` |
 | 端到端链路走查 | ✅ **真实实测** | `real_run.py` 12 次真实调用跑通，**全程只读** |
-| 渠道计价与对比 | ✅ 真实 | `decider.py` 纯标准库实现，119 项自测覆盖各决策分支 |
+| 渠道计价与对比 | ✅ 真实 | `decider.py` 纯标准库实现，137 项自测覆盖各决策分支 |
 | 页面与 CLI 一致 | ✅ 真实 | `parity_check.py` 逐场景对拍两端（56 项比对），防止两份实现漂移 |
 | 真实数据回归 | ✅ **真实实测** | 24 项断言锁定真实接口契约，见 `sample_data/real_snapshot.json` |
+| **两次独立采集交叉验证** | ✅ **真实实测** | 10-22 脚本采集 vs 10-23 原生通道采集，到店核价返回字段集完全一致 |
 | 「到店省 7.30 元」结论 | ✅ **真实算出** | 真实数据跑出的结果：到店 ¥11.90 / 外送 ¥20.70 |
 | 配送费与打包费 | ✅ **真实实测** | 外送核价返回 `deliveryPrice=600`、`packingPrice=280`（单位：分） |
 | 券的抵扣额 | ✅ **真实实测** | 麦辣鸡腿汉堡 ¥22.5，券价 ¥11.9 → 抵扣 ¥10.6 |
@@ -390,7 +392,7 @@ python real_run.py              # 用【你自己的】账号跑真实链路
 | `mcp-config.example.json`（只允许环境变量占位符） | ✅ 仅 `Bearer ${MCD_MCP_TOKEN}` |
 | `workbuddy.md`（WorkBuddy 专项） | ✅ 含开发环境、时间线、协作方式与已知边界 |
 | 源代码 | ✅ `skills/mcd-route/scripts/` |
-| 真实使用麦当劳 MCP | ✅ `mcp_probe.py` 可复现握手 + tools/list + 调用 |
+| 真实使用麦当劳 MCP | ✅ 原生连接器 `mcd-mcp` 实调 4 个 Tool（`mcp__mcd-mcp__*`），快照见 `sample_data/live_20261023.json`；`mcp_probe.py` 可复现握手 + tools/list + 调用 |
 | 真实使用 WorkBuddy | ✅ 本项目全程在 WorkBuddy 中开发，过程见 `workbuddy.md` |
 | 未包含真实 Token / 密钥 | ✅ 全仓库仅含环境变量占位符 |
 | 内容合规 | ✅ 中性表述，不与其它品牌对比，不贬损麦当劳 |
@@ -425,14 +427,16 @@ python real_run.py              # 用【你自己的】账号跑真实链路
     ├── scripts/
     │   ├── mcp_client.py          # 纯标准库 MCP 客户端（握手/工具列表/调用/合规护栏）
     │   ├── decider.py             # 决策引擎：渠道计价、对比、券体检、单位归一化
-    │   ├── selftest.py            # 127 项自测
+    │   ├── selftest.py            # 137 项自测
     │   ├── parity_check.py        # 前后端对拍（页面 vs CLI）
     │   ├── parity_check.mjs       # 前端计算引擎抽取器
     │   ├── setup_token.py         # 交互式配置 Token（不回显，不进对话）
     │   ├── setup_mcp.ps1          # Windows 一键写入 WorkBuddy 连接器配置（无 BOM）
     │   ├── mcp_probe.py           # MCP 连通性自检（四层）
     │   └── sample_data/
-    │       └── scenario.json      # 离线样例，无需 Token 即可跑通
+    │       ├── scenario.json      # 离线样例，无需 Token 即可跑通
+    │       ├── real_snapshot.json # 10-22 脚本采集的真实接口契约快照
+    │       └── live_20261023.json # 10-23 WorkBuddy 原生 MCP 通道实采快照
     └── references/
         └── mcp-tools.md           # Tool 清单、字段映射、金额单位契约、实测记录
 ```
@@ -447,7 +451,7 @@ python real_run.py              # 用【你自己的】账号跑真实链路
 - **券的场景建模** —— 建模 `channel` 字段，解决「券用不了」这个真实痛点。
 - **保守计价** —— 不叠加券、不猜价格，宁可少报优惠也不给假低价。
 - **诚实降级** —— 起送价未达标、距离不可得、字段缺失，都有明确的降级说明。
-- **119 项自测** —— 覆盖券可用性、选券策略、计价、决策分支、字段归一化、金额单位契约、合规护栏七类。
+- **137 项自测** —— 覆盖券可用性、选券策略、计价、决策分支、字段归一化、金额单位契约、合规护栏七类。
 - **前后端对拍** —— 在线试算页与 CLI 是同一套逻辑，逐场景比对 56 项，防止漂移。
 
 ---

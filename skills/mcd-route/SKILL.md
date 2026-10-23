@@ -174,7 +174,7 @@ python scripts/decider.py --scenario <scenario.json> --minute-cost 0.5
 ```
 scripts/mcp_client.py   纯标准库 MCP 客户端（握手 / tools/list / tools/call）
 scripts/decider.py      决策引擎：渠道计价、对比、券体检
-scripts/selftest.py     127 项自测，改逻辑后必跑
+scripts/selftest.py     137 项自测，改逻辑后必跑
 scripts/mcp_probe.py    连通性自检：证明数据链路是真的
 scripts/setup_token.py  交互式写入本地凭据文件（不回显）
 scripts/setup_mcp.ps1   Windows：把凭据写进 WorkBuddy 连接器配置（无 BOM）
@@ -191,6 +191,24 @@ Windows 用户再点【信任】并重启 WorkBuddy 即可）。
 > 为什么必须走原生通道：官方《麦当劳MCP服务规则》第三条与第六条
 > 明确限制批量 / 自动化 / 脚本调用本服务。本仓库的 Python 脚本仅供
 > **开发期自测与降级备用**，正式交付形态以 WorkBuddy 原生 Tool 调用为准。
+
+**已实测可用的调用链（2026-10-23 原生通道实采）**：
+
+| 步骤 | Tool | 关键参数 | 拿到的数据 |
+|---|---|---|---|
+| 1 | `query-nearby-stores` | `beType=1, searchType=2, city, keyword` | storeCode、distance（米）、营业时段 |
+| 2 | `query-meals` | `storeCode, orderType=1, beType=1` | productCode、现价/划线价、优惠类型（**元**） |
+| 3 | `query-store-coupons` | `storeCode, orderType, beType` | 券与绑定商品（**可能返回空数组，是真实业务状态**） |
+| 4 | `calculate-price` | `storeCode, orderType, beType, items[]` | 到手价（**分**）、takeWayList |
+
+**外送侧**：`delivery-query-address` → `delivery-query-stores`
+（需 `beCode`）→ `calculate-price`（`orderType=2, beType=2`）。
+`addressId` 属于用户个人地址，**需用户主动提供，不得代为猜测或预置**。
+
+**降级规则**：
+- 到店核价返回**不含** `deliveryPrice` / `packingPrice`（外送才有）→ 记 0 并在 notes 说明
+- 券查询返回 `data:[]` → 判定为该门店该渠道无券，**换店交叉验证后仍为空则确认为真实状态**，不做兜底估算
+- 任何字段缺失一律走 `parse_calculate_price` 的 notes 通道，**不猜不估**
 
 ## 隐私与合规
 
