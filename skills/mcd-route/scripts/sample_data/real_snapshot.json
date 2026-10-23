@@ -22,7 +22,7 @@
       "_key_finding": "接口【确实返回 distance 距离字段（米）】，还带经纬度。早期文档假设「不返回距离」是错的。"
     },
     "delivery_query_stores": {
-      "params": { "addressId": "<已脱敏>", "beType": 2 },
+      "params": { "addressId": "<已脱敏：用户个人配送地址ID>", "beType": 2 },
       "response_data_item": {
         "storeCode": "1980260",
         "beCode": "198026002",
